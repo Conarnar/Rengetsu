@@ -1,9 +1,11 @@
 import os
 import json
+import rengetsu
 from pathlib import Path
 
 def start(token):
-	print(token)
+	bot = rengetsu.Rengetsu(token)
+	bot.start()
 
 if __name__ == '__main__':
 	path = 'reng_dat/'

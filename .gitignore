@@ -128,5 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Rengetsu data folder
+# Rengetsu generated files
 /reng_dat/
+/reng_log/
