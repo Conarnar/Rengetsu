@@ -8,8 +8,7 @@ def start(token):
 	bot.start()
 
 if __name__ == '__main__':
-	path = 'reng_dat/'
-	file = path + 'settings.txt'
+	file = 'reng_dat/settings.txt'
 	if (os.path.isfile(file)):
 		try:
 			with open(file) as f:
@@ -21,8 +20,7 @@ if __name__ == '__main__':
 		try:
 			token = input('Please enter token: ')
 			settings = {'token' : token}
-			if (not os.path.isdir(path)):
-				os.mkdir(path)
+			os.makedirs(os.path.dirname(file), exist_ok=True)
 			with open(file, 'w') as f:
 				json.dump(settings, f, indent=4)
 			print('Settings file created:', Path('reng_dat/settings.txt').absolute())

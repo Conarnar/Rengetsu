@@ -5,8 +5,7 @@ from datetime import datetime
 
 class Rengetsu:
 	def __init__(self, token):
-		if (not os.path.isdir('reng_log/')):
-			os.mkdir('reng_log/')
+		os.makedirs('reng_log/', exist_ok=True)
 		logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s] %(name)s: %(message)s')
 		logger = logging.getLogger('discord')
 		handler = logging.FileHandler(filename=datetime.now().strftime('reng_log/rengetsu_%Y_%m_%d_%H_%M_%S_%f.log'), encoding='utf-8', mode='w')
