@@ -1,9 +1,8 @@
 import commands
-import asyncio
 import random
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'dice', 'd', 'roll', 'rng'))
-async def dice(line, message):
+async def c_dice(line, message):
 	args = line.split()
 	if len(args) == 2:
 		try:
@@ -29,7 +28,7 @@ async def dice(line, message):
 
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'multiroll', 'multi'))
-async def multiroll(line, message):
+async def c_multiroll(line, message):
 	args = line.split()
 	if len(args) == 3:
 		try:
@@ -74,7 +73,7 @@ async def multiroll(line, message):
 	return '**[Usage]** !multiroll <amount> <range> [range]'
 
 @commands.command(condition=lambda line : len(line.split()) == 1)
-async def multiroll_short(line, message):
+async def c_multiroll_short(line, message):
 	roll = line.split()[0].split('d')
 
 	if len(roll) != 2:
