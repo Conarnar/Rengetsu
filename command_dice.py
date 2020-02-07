@@ -2,7 +2,7 @@ import commands
 import random
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'dice', 'd', 'roll', 'rng'))
-async def c_dice(line, message):
+async def command_dice(line, message, reng):
 	args = line.split()
 	if len(args) == 2:
 		try:
@@ -28,7 +28,7 @@ async def c_dice(line, message):
 
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'multiroll', 'multi'))
-async def c_multiroll(line, message):
+async def command_multiroll(line, message, reng):
 	args = line.split()
 	if len(args) == 3:
 		try:
@@ -73,7 +73,7 @@ async def c_multiroll(line, message):
 	return '**[Usage]** !multiroll <amount> <range> [range]'
 
 @commands.command(condition=lambda line : len(line.split()) == 1)
-async def c_multiroll_short(line, message):
+async def command_multiroll_short(line, message, reng):
 	roll = line.split()[0].split('d')
 
 	if len(roll) != 2:
@@ -90,3 +90,7 @@ async def c_multiroll_short(line, message):
 		return f"Rolled {', '.join(('**' + str(i) + '**') for i in res)} Total: **{sum(res)}**"
 	except ValueError:
 		raise commands.SkipCommand
+
+@commands.command(condition=lambda line : commands.first_arg_match(line, 'percent', '%'))
+async def command_percent(line, message, reng):
+	return f'Rolled **{random.randint(1, 100)}**'

@@ -4,6 +4,18 @@ def command(condition=lambda line : True):
 		return command
 	return decor
 
+def menu(id_list):
+	def decor(func):
+		func.id_list = id_list
+		return func
+	return decor
+
+def type_command(id_list):
+	def decor(func):
+		func.id_list = id_list
+		return func
+	return decor
+
 def first_arg_match(line, *match):
 	args = line.split()
 	if len(args) == 0:

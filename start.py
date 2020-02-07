@@ -5,7 +5,7 @@ from pathlib import Path
 
 def start(token):
 	bot = rengetsu.Rengetsu(token)
-	bot.start()
+	bot.run()
 
 if __name__ == '__main__':
 	file = 'reng_dat/settings.txt'
@@ -15,7 +15,7 @@ if __name__ == '__main__':
 				settings = json.load(f)
 				start(settings['token'])
 		except OSError:
-			print('Could not read settings file:', str(e))
+			print('Could not read settings file:', e)
 	else:
 		try:
 			token = input('Please enter token: ')
@@ -26,4 +26,4 @@ if __name__ == '__main__':
 			print('Settings file created:', Path('reng_dat/settings.txt').absolute())
 			start(token)
 		except OSError as e:
-			print('Could not create settings file:', str(e))
+			print('Could not create settings file:', e)
