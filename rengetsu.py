@@ -24,6 +24,7 @@ class Rengetsu:
 		self.commands = []
 		self.menus = []
 		self.type_commands = []
+		self.message_modifies = []
 		self.logger = logger
 
 		self.data_file = 'reng_dat/rengetsu.dat'
@@ -44,15 +45,28 @@ class Rengetsu:
 		command_loader.load_commands(self.commands)
 		command_loader.load_menus(self.menus)
 		command_loader.load_type_commands(self.type_commands)
+		command_loader.load_message_modifies(self.message_modifies)
 		self.load_listeners()
 
 		loop = self.client.loop
 		try:
+			command_loader.on_load(self)
+			loop.create_task(self.saving())
 			loop.run_until_complete(self.client.start(self.token))
 		except KeyboardInterrupt:
 			loop.run_until_complete(self.client.logout())
 		finally:
 			loop.close()
+
+		self.save()
+	
+	async def saving(self):
+		while True:
+			await asyncio.sleep(3600)
+			self.save()
+
+	def save(self):
+		command_loader.on_save(self)
 
 		try:
 			with open(self.data_file, 'w') as f:
@@ -67,13 +81,32 @@ class Rengetsu:
 		async def on_ready():
 			self.logger.info(f'Logged on as {self.client.user}')
 
+		async def on_message_modify(message_id):
+			for message_modify in self.message_modifies:
+				if message_id in message_modify.mm_id_list:
+					await message_modify(message_id, self)
+					return
+
+		@self.client.event
+		async def on_raw_bulk_message_delete(payload):
+			for message in payload.message_ids:
+				await on_message_modify(message)
+
+		@self.client.event
+		async def on_raw_message_delete(payload):
+			await on_message_modify(payload.message_id)
+
+		@self.client.event
+		async def on_raw_message_edit(payload):
+			await on_message_modify(payload.message_id)
+
 		@self.client.event
 		async def on_raw_reaction_add(payload):
 			if payload.member.bot:
 				return
 
 			for menu in self.menus:
-				if payload.message_id in menu.id_list:
+				if payload.message_id in menu.menu_id_list:
 					await self.client.http.remove_reaction(payload.channel_id, payload.message_id, payload.emoji, payload.user_id)
 					await menu(payload, self)
 					return
@@ -88,24 +121,25 @@ class Rengetsu:
 				return
 
 			for type_command in self.type_commands:
-				if (message.channel.id, message.author.id) in type_command.id_list:
+				if (message.channel.id, message.author.id) in type_command.tc_id_list:
 					await type_command(message, self)
 					await self.client.http.delete_message(message.channel.id, message.id, reason='Type command')
 					return
 
 			return_message = []
-			for line in message.content.split('\n'):
-				if line.startswith('!'):
-					line = line[1:]
-					for command in self.commands:
-						if (command.condition(line)):
-							try:
-								ln = await command(line, message, self)
-								if (ln != None):
-									return_message.append(ln)
-								break
-							except commands.SkipCommand:
-								pass
+
+			cmds = [line.strip()[1:] for line in message.content.split('\n') if line.strip().startswith('!')]
+
+			for line in cmds:
+				for command in self.commands:
+					if (command.condition(line)):
+						try:
+							ln = await command(line, message, {'len': len(cmds)}, self)
+							if (ln != None):
+								return_message.append(ln)
+							break
+						except commands.SkipCommand:
+							pass
 
 			send = None
 			if (len(return_message) == 1):
@@ -114,6 +148,6 @@ class Rengetsu:
 				send = message.author.mention + '\n' + '\n'.join(return_message)
 			if send != None:
 				if len(send) > 2000:
-					await message.channel.send(f'{message.author.mention} **[Message Error]** Message is too long to display (>2000 characters)')
-				else:
-					await message.channel.send(send)
+					send = f'{message.author.mention} **[Message Error]** Message is too long to display (>2000 characters)'
+				
+				await message.channel.send(send)

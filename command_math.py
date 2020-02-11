@@ -113,7 +113,7 @@ class Calculator:
 		return x
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'calculate', 'math'))
-async def command_calculate(line, message, reng):
+async def command_calculate(line, message, meta, reng):
 	try:
 		calc = Calculator(line.strip()[5:])
 		drs = calc.dicerolls()

@@ -2,7 +2,7 @@ import commands
 import discord
 
 @commands.command(condition=lambda line: commands.first_arg_match(line, 'here', 'ping'))
-async def command_here(line, message, reng):
+async def command_here(line, message, meta, reng):
 	if message.guild == None:
 		return '**[Channel Error]** This command is only available in server channels'
 

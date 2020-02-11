@@ -6,13 +6,19 @@ def command(condition=lambda line : True):
 
 def menu(id_list):
 	def decor(func):
-		func.id_list = id_list
+		func.menu_id_list = id_list
 		return func
 	return decor
 
 def type_command(id_list):
 	def decor(func):
-		func.id_list = id_list
+		func.tc_id_list = id_list
+		return func
+	return decor
+
+def message_modify(id_list):
+	def decor(func):
+		func.mm_id_list = id_list
 		return func
 	return decor
 

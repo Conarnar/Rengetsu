@@ -298,9 +298,15 @@ def generate_message(role_dat, extras, reng, ended=None):
 	return res
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'role'))
-async def command_role(line, message, reng):
+async def command_role(line, message, meta, reng):
 	if message.guild == None:
 		return '**[Channel Error]** This command is only available in server channels'
+
+	if message.author.guild_permissions.administrator:
+		return '**[Permission Error]** You do not have permission to use this command'
+
+	if meta['len'] != 1:
+		return '**[Message Error]** This command cannot be used with other commands in the same message'
 
 	args = line.split()
 
@@ -327,3 +333,7 @@ async def command_role(line, message, reng):
 	await mes.add_reaction(emoji.CHECKMARK)
 	await mes.add_reaction(emoji.CROSSMARK)
 	await mes.add_reaction(emoji.NO_ENTRY)
+
+@commands.command(condition=lambda line : commands.first_arg_match(line, 'request', 'requestrole'))
+async def command_request(line, message, meta, reng):
+	return '**[Not Implemented]**'	
