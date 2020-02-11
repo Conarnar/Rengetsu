@@ -302,7 +302,7 @@ async def command_role(line, message, meta, reng):
 	if message.guild == None:
 		return '**[Channel Error]** This command is only available in server channels'
 
-	if message.author.guild_permissions.administrator:
+	if not message.author.guild_permissions.administrator:
 		return '**[Permission Error]** You do not have permission to use this command'
 
 	if meta['len'] != 1:
@@ -336,4 +336,4 @@ async def command_role(line, message, meta, reng):
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'request', 'requestrole'))
 async def command_request(line, message, meta, reng):
-	return '**[Not Implemented]**'	
+	return '**[Not Implemented]**'

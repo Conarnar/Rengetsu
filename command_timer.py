@@ -13,13 +13,13 @@ timer_dict = {}
 
 def cancel(message):
 	if message in timer_dict:
-		timer_dict[message][0].cancel()
+		timer_dict[message]['task'].cancel()
 		del timer_dict[message]
 
 
 @commands.menu(id_list=timer_dict)
 async def menu_cancel(payload, reng):
-	if payload.user_id != timer_dict[payload.message_id][1]:
+	if payload.user_id != timer_dict[payload.message_id]['user_id']:
 		return
 	cancel(payload.message_id)
 
@@ -61,7 +61,8 @@ async def command_timer(line, message, meta, reng):
 	desc = args[2] if len(args) == 3 else 'Timer is done'
 	now = time.time()
 	task = reng.client.loop.create_task(timer(message.channel.id, message.id, message.author.mention, desc, delay, now, reng))
-	timer_dict[message.id] = (task, message.author.id, message.channel.id, desc, now, now + delay)
+	timer_dict[message.id] = {'task': task, 'user_id': message.author.id, 'message_id': message.id, 'channel_id': message.channel.id, 'message': desc,
+		'set_on': now, 'end_on': now + delay}
 	await message.add_reaction(emoji.X)
 	return f'Timer has been set. Edit, delete, or {emoji.X} the original message to cancel.'
 
@@ -73,7 +74,4 @@ def on_load(reng):
 			timer_dict[timer_dat['message_id']] = (task, timer_dat['user_id'], timer_dat['channel_id'], timer_dat['message'], timer_dat['set_on'], timer_dat['end_on'])
 
 def on_save(reng):
-	timers = []
-	for key, value in timer_dict.items():
-		timers.append({'message_id': key, 'user_id': value[1], 'channel_id': value[2], 'message': value[3], 'set_on': value[4], 'end_on': value[5]})
-	reng.data['timers'] = timers
+	reng.data['timers'] = [{k: v for k, v in value.items() if k != 'task'} for value in timer_dict.values()]
