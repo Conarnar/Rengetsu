@@ -20,6 +20,8 @@ def load_menus(menus):
 	menus.append(command_role.menu_agreement)
 	menus.append(command_role.menu_add_remove)
 	menus.append(command_timer.menu_cancel)
+	menus.append(command_role.menu_cancel)
+	menus.append(command_role.menu_agreement_pending)
 
 def load_type_commands(type_commands):
 	type_commands.append(command_role.type_command_agreement)
@@ -27,9 +29,15 @@ def load_type_commands(type_commands):
 
 def load_message_modifies(message_modifies):
 	message_modifies.append(command_timer.modify_cancel)
+	message_modifies.append(command_role.modify_cancel)
 
 def on_load(reng):
 	command_timer.on_load(reng)
+	command_role.on_load(reng)
+
+def on_login(reng):
+	command_role.on_login(reng)
 
 def on_save(reng):
 	command_timer.on_save(reng)
+	command_role.on_save(reng)

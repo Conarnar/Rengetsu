@@ -59,8 +59,14 @@ class Rengetsu:
 			loop.close()
 
 		self.save()
+
+	def console(self):
+		while input() != 'stop':
+			pass
+		self.client.loop.create_task(self.client.logout())
 	
 	async def saving(self):
+		await self.client.loop.run_in_executor(None, self.console);
 		while True:
 			await asyncio.sleep(3600)
 			self.save()
@@ -80,6 +86,7 @@ class Rengetsu:
 		@self.client.event
 		async def on_ready():
 			self.logger.info(f'Logged on as {self.client.user}')
+			command_loader.on_login(self)
 
 		async def on_message_modify(message_id):
 			for message_modify in self.message_modifies:
@@ -102,12 +109,15 @@ class Rengetsu:
 
 		@self.client.event
 		async def on_raw_reaction_add(payload):
-			if payload.member.bot:
+			if payload.user_id == self.client.user.id:
 				return
 
 			for menu in self.menus:
 				if payload.message_id in menu.menu_id_list:
-					await self.client.http.remove_reaction(payload.channel_id, payload.message_id, payload.emoji, payload.user_id)
+					try:
+						await self.client.http.remove_reaction(payload.channel_id, payload.message_id, payload.emoji, payload.user_id)
+					except discord.errors.Forbidden:
+						pass
 					await menu(payload, self)
 					return
 
@@ -123,7 +133,7 @@ class Rengetsu:
 			for type_command in self.type_commands:
 				if (message.channel.id, message.author.id) in type_command.tc_id_list:
 					await type_command(message, self)
-					await self.client.http.delete_message(message.channel.id, message.id, reason='Type command')
+					await self.client.http.delete_message(message.channel.id, message.id)
 					return
 
 			return_message = []

@@ -1,13 +1,10 @@
 import commands
 import asyncio
-import re
 import discord
 import emoji
 import datetime
 import time
-
-time_regex = re.compile(r'(\d+)([dhms])')
-time_to_seconds = {'d': 86400, 'h': 3600, 'm': 60, 's': 1}
+import util
 
 timer_dict = {}
 
@@ -27,34 +24,26 @@ async def menu_cancel(payload, reng):
 async def modify_cancel(message_id, reng):
 	cancel(message_id)
 
-def parse_time(string):
-	try:
-		return int(string)
-	except ValueError:
-		pass
-
-	time = 0
-	for match in time_regex.finditer(string.lower()):
-		time += int(match.group(1)) * time_to_seconds[match.group(2)]
-	return time
-
 async def timer(channel_id, message_id, mention, desc, delay, set_on, reng):
 	try:
 		await asyncio.sleep(delay)
+		del timer_dict[message_id]
 		embed = discord.Embed(title='Timer', description=desc, timestamp=datetime.datetime.utcfromtimestamp(set_on))
 		embed.set_footer(text='Set on:')
 		await reng.client.http.send_message(channel_id, mention, embed=embed.to_dict())
-		del timer_dict[message_id]
 	except asyncio.CancelledError:
 		await reng.client.http.send_message(channel_id, f'{mention} Your timer has been cancelled')
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'timer'))
 async def command_timer(line, message, meta, reng):
+	if meta['len'] != 1:
+		return '**[Message Error]** This command cannot be used with other commands in the same message'
+	
 	args = line.split(maxsplit=2)
 
 	if len(args) == 0:
 		return '**[Usage]** !timer <time> [message]'
-	delay = parse_time(args[1])
+	delay = util.parse_time(args[1])
 	if delay <= 0 or delay > 604800:
 		return f'**[Argument Error]** Arg 1 ({args[1]}) must represent time between 1 second and 1 week'
 
@@ -71,7 +60,8 @@ def on_load(reng):
 		if timer_dat['end_on'] > time.time():
 			task = reng.client.loop.create_task(timer(timer_dat['channel_id'], timer_dat['message_id'], f'<@{timer_dat["user_id"]}>', timer_dat['message'],
 				timer_dat['end_on'] - time.time(), timer_dat['set_on'], reng))
-			timer_dict[timer_dat['message_id']] = (task, timer_dat['user_id'], timer_dat['channel_id'], timer_dat['message'], timer_dat['set_on'], timer_dat['end_on'])
-
+			timer_dict[timer_dat['message_id']] = dict(timer_dat)
+			timer_dict[timer_dat['message_id']].update({'task': task})
+	
 def on_save(reng):
 	reng.data['timers'] = [{k: v for k, v in value.items() if k != 'task'} for value in timer_dict.values()]
