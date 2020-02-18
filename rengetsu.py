@@ -122,6 +122,14 @@ class Rengetsu:
 					return
 
 		@self.client.event
+		async def on_member_join(member):
+			for k, v in self.data.setdefault('servers', {}).setdefault(str(member.guild.id), {}).setdefault('roles', {}).items():
+				if v.setdefault('add_on_join', False):
+					role = member.guild.get_role(int(k))
+					if role != None:
+						await member.add_roles(role, reason='Added on join')
+
+		@self.client.event
 		async def on_message(message):
 			if message.author.bot:
 				return

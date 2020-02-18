@@ -63,12 +63,6 @@ async def menu_main(payload, reng):
 	if payload.emoji.name == emoji.BRIEFCASE:
 		role_dat['add_on_join'] = not role_dat.setdefault('add_on_join', False)
 		edit = True
-	elif payload.emoji.name == emoji.GHOST:
-		role_dat['add_on_inactive'] = not role_dat.setdefault('add_on_inactive', False)
-		edit = True
-	elif payload.emoji.name == emoji.ROBOT:
-		role_dat['bot_permission'] = not role_dat.setdefault('bot_permission', False)
-		edit = True
 	elif payload.emoji.name == emoji.MEGAPHONE:
 		role_dat['requestable'] = not role_dat.setdefault('requestable', False)
 		role_dat['requestable_temp'] = False
@@ -200,8 +194,6 @@ async def menu_add_remove(payload, reng):
 		await reng.client.http.edit_message(payload.channel_id, payload.message_id, content=generate_message(role_dat, extras, reng))
 		await reng.client.http.clear_reactions(payload.channel_id, payload.message_id)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.BRIEFCASE)
-		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.GHOST)
-		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.ROBOT)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.MEGAPHONE)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.CLOCK_2)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.PENCIL)
@@ -275,8 +267,6 @@ async def menu_agreement(payload, reng):
 		await reng.client.http.edit_message(payload.channel_id, payload.message_id, content=generate_message(role_dat, extras, reng))
 		await reng.client.http.clear_reactions(payload.channel_id, payload.message_id)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.BRIEFCASE)
-		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.GHOST)
-		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.ROBOT)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.MEGAPHONE)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.CLOCK_2)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.PENCIL)
@@ -314,16 +304,6 @@ def generate_message(role_dat, extras, reng, ended=None):
 		res += f'\nAdded to new members (Toggle: {emoji.BRIEFCASE})'
 	else:
 		res += f'\nNot added to new members (Toggle: {emoji.BRIEFCASE})'
-
-	if role_dat.setdefault('add_on_inactive', False):
-		res += f'\nAdded to inactive members (Toggle: {emoji.GHOST})'
-	else:
-		res += f'\nNot added to inactive members (Toggle: {emoji.GHOST})'
-
-	if role_dat.setdefault('bot_permission', False):
-		res += f'\nAllows usage of commands (Toggle: {emoji.ROBOT})'
-	else:
-		res += f'\nDoes not allow usage of commands (Toggle: {emoji.ROBOT})'
 
 	if role_dat.setdefault('requestable', False):
 		res += f'\nRequestable (Toggle: {emoji.MEGAPHONE})'
@@ -377,8 +357,6 @@ async def command_role(line, message, meta, reng):
 	mes = await message.channel.send(generate_message(role_dat, extras, reng))
 	main_menu_dict[mes.id] = (message.author.id, dict(role_dat), extras)
 	await mes.add_reaction(emoji.BRIEFCASE)
-	await mes.add_reaction(emoji.GHOST)
-	await mes.add_reaction(emoji.ROBOT)
 	await mes.add_reaction(emoji.MEGAPHONE)
 	await mes.add_reaction(emoji.CLOCK_2)
 	await mes.add_reaction(emoji.PENCIL)
@@ -537,7 +515,7 @@ async def command_request(line, message, meta, reng):
 		return f'You have been given the {roles[0].name} role'
 
 def on_login(reng):
-	for guild_id in reng.data.setdefault('servers', []):
+	for guild_id in reng.data.setdefault('servers', {}):
 		guild = reng.client.get_guild(int(guild_id))
 		if guild != None:
 			roles = reng.data['servers'][guild_id].setdefault('roles', [])

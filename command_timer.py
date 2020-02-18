@@ -32,12 +32,12 @@ async def timer(channel_id, message_id, mention, desc, delay, set_on, reng):
 		embed.set_footer(text='Set on:')
 		await reng.client.http.send_message(channel_id, mention, embed=embed.to_dict())
 	except asyncio.CancelledError:
-		await reng.client.http.send_message(channel_id, f'{mention} Your timer has been cancelled')
+		await reng.client.http.send_message(channel_id, f'{mention} Your timer has been cancelled.')
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'timer'))
 async def command_timer(line, message, meta, reng):
 	if meta['len'] != 1:
-		return '**[Message Error]** This command cannot be used with other commands in the same message'
+		return '**[Message Error]** This command cannot be used with other commands in the same message.'
 	
 	args = line.split(maxsplit=2)
 
@@ -45,7 +45,7 @@ async def command_timer(line, message, meta, reng):
 		return '**[Usage]** !timer <time> [message]'
 	delay = util.parse_time(args[1])
 	if delay <= 0 or delay > 604800:
-		return f'**[Argument Error]** Arg 1 ({args[1]}) must represent time between 1 second and 1 week'
+		return f'**[Argument Error]** Arg 1 ({args[1]}) must represent time between 1 second and 1 week.'
 
 	desc = args[2] if len(args) == 3 else 'Timer is done'
 	now = time.time()

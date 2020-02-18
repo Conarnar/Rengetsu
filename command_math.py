@@ -118,10 +118,10 @@ async def command_calculate(line, message, meta, reng):
 		calc = Calculator(line.strip()[5:])
 		drs = calc.dicerolls()
 		if len(drs) > 0:
-			return f'Result: **{calc.value()}** [' + ' | '.join(drs) + ']'
+			return f'Result: **{calc.value()}** [' + ' | '.join(drs) + '].'
 		else:
-			return f'Result: **{calc.value()}**'
+			return f'Result: **{calc.value()}**.'
 	except ValueError as e:
-		return f'**[Syntax Error]** {e}'
+		return f'**[Syntax Error]** {e}.'
 	except OverflowError as e:
-		return f'**[Overflow Error]** {e}'
+		return f'**[Overflow Error]** {e}.'
