@@ -3,8 +3,8 @@ import json
 import rengetsu
 from pathlib import Path
 
-def start(token):
-	bot = rengetsu.Rengetsu(token)
+def start(settings):
+	bot = rengetsu.Rengetsu(settings)
 	bot.run()
 
 if __name__ == '__main__':
@@ -13,7 +13,7 @@ if __name__ == '__main__':
 		try:
 			with open(file) as f:
 				settings = json.load(f)
-				start(settings['token'])
+				start(settings)
 		except OSError:
 			print('Could not read settings file:', e)
 	else:
@@ -24,6 +24,6 @@ if __name__ == '__main__':
 			with open(file, 'w') as f:
 				json.dump(settings, f, indent=4)
 			print('Settings file created:', Path('reng_dat/settings.txt').absolute())
-			start(token)
+			start(settings)
 		except OSError as e:
 			print('Could not create settings file:', e)

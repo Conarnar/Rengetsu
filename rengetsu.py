@@ -8,8 +8,10 @@ import threading
 import json
 from datetime import datetime
 
+status_dict = {'online': discord.Status.online, 'idle': discord.Status.idle, 'dnd': discord.Status.dnd, 'invis': discord.Status.invisible}
+
 class Rengetsu:
-	def __init__(self, token):
+	def __init__(self, settings):
 		file = filename=datetime.now().strftime('reng_log/rengetsu_%Y_%m_%d_%H_%M_%S_%f.log')
 		debug_file = 'reng_log/debug.log'
 		os.makedirs(os.path.dirname(file), exist_ok=True)
@@ -18,9 +20,11 @@ class Rengetsu:
 		handler = logging.FileHandler(file, encoding='utf-8', mode='w')
 		handler.setFormatter(logging.Formatter('[%(asctime)s][%(levelname)s] %(name)s: %(message)s'))
 		logger.addHandler(handler)
+		logger = logging.getLogger('rengetsu')
+		logger.addHandler(handler)
 
-		self.token = token
-		self.client = discord.Client()
+		self.token = settings['token']
+		self.client = discord.Client(status=status_dict[settings.setdefault('status', 'online')], activity=discord.Game(settings.setdefault('activity', '')))
 		self.commands = []
 		self.menus = []
 		self.type_commands = []
@@ -29,6 +33,9 @@ class Rengetsu:
 
 		self.data_file = 'reng_dat/rengetsu.dat'
 		self.data = {}
+
+		self.settings_file = 'reng_dat/settings.txt'
+		self.settings = settings
 
 		try:
 			if (os.path.isfile(self.data_file)):
@@ -58,20 +65,49 @@ class Rengetsu:
 		finally:
 			loop.close()
 
-		self.save()
+		self.save_data()
 
 	def console(self):
-		while input() != 'stop':
-			pass
+		while True:
+			line = input()
+			args = line.split()
+			if len(args) > 0:
+				if args[0] == 'stop':
+					break
+				elif args[0] == 'status':
+					if len(args) == 2:
+						if args[1] in status_dict:
+							self.settings['status'] = args[1]
+							self.client.loop.create_task(self.client.change_presence(status=status_dict[args[1]]))
+							self.logger.info(f'Status set to {args[1]}.')
+							self.save_settings()
+							continue
+					print('[Usage] status (online|idle|dnd|invis)')
+					continue
+				elif args[0] == 'play':
+					if len(args) == 1:
+						self.client.loop.create_task(self.client.change_presence(activity=None))
+						self.settings['activity'] = ''
+						self.logger.info('Activity removed.')
+						self.save_settings()
+						continue
+
+					activity = line.split(maxsplit=1)[1]
+					self.settings['activity'] = activity
+					self.client.loop.create_task(self.client.change_presence(activity=discord.Game(activity)))
+					self.logger.info(f'Activity set to {activity}.')
+					self.save_settings()
+					continue
+			print('Unknown command')
 		self.client.loop.create_task(self.client.logout())
 	
 	async def saving(self):
 		await self.client.loop.run_in_executor(None, self.console);
 		while True:
 			await asyncio.sleep(3600)
-			self.save()
+			self.save_data()
 
-	def save(self):
+	def save_data(self):
 		command_loader.on_save(self)
 
 		try:
@@ -80,6 +116,14 @@ class Rengetsu:
 			self.logger.info('Data successfully saved')
 		except OSError as e:
 			self.logger.error('Could not save data file:', e)
+
+	def save_settings(self):
+		try:
+			with open(self.settings_file, 'w') as f:
+				json.dump(self.settings, f, indent=4)
+			self.logger.info('Settings successfully saved')
+		except OSError as e:
+			self.logger.error('Could not save settings file:', e)
 
 
 	def load_listeners(self):
