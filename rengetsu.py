@@ -6,6 +6,7 @@ import command_loader
 import asyncio
 import threading
 import json
+import time
 from datetime import datetime
 
 status_dict = {'online': discord.Status.online, 'idle': discord.Status.idle, 'dnd': discord.Status.dnd, 'invis': discord.Status.invisible}
@@ -58,7 +59,9 @@ class Rengetsu:
 		loop = self.client.loop
 		try:
 			command_loader.on_load(self)
+			loop.create_task(self.console_init())
 			loop.create_task(self.saving())
+			loop.create_task(self.inactivity())
 			loop.run_until_complete(self.client.start(self.token))
 		except KeyboardInterrupt:
 			loop.run_until_complete(self.client.logout())
@@ -68,41 +71,75 @@ class Rengetsu:
 		self.save_data()
 
 	def console(self):
-		while True:
-			line = input()
-			args = line.split()
-			if len(args) > 0:
-				if args[0] == 'stop':
-					break
-				elif args[0] == 'status':
-					if len(args) == 2:
-						if args[1] in status_dict:
-							self.settings['status'] = args[1]
-							self.client.loop.create_task(self.client.change_presence(status=status_dict[args[1]]))
-							self.logger.info(f'Status set to {args[1]}.')
+		try:
+			while True:
+				line = input()
+				args = line.split()
+				if len(args) > 0:
+					if args[0] == 'stop':
+						break
+					elif args[0] == 'status':
+						if len(args) == 2:
+							if args[1] in status_dict:
+								self.settings['status'] = args[1]
+								self.client.loop.create_task(self.client.change_presence(status=status_dict[args[1]]))
+								self.logger.info(f'Status set to {args[1]}.')
+								self.save_settings()
+								continue
+						print('[Usage] status (online|idle|dnd|invis)')
+						continue
+					elif args[0] == 'play':
+						if len(args) == 1:
+							self.client.loop.create_task(self.client.change_presence(activity=None))
+							self.settings['activity'] = ''
+							self.logger.info('Activity removed.')
 							self.save_settings()
 							continue
-					print('[Usage] status (online|idle|dnd|invis)')
-					continue
-				elif args[0] == 'play':
-					if len(args) == 1:
-						self.client.loop.create_task(self.client.change_presence(activity=None))
-						self.settings['activity'] = ''
-						self.logger.info('Activity removed.')
+
+						activity = line.split(maxsplit=1)[1]
+						self.settings['activity'] = activity
+						self.client.loop.create_task(self.client.change_presence(activity=discord.Game(activity)))
+						self.logger.info(f'Activity set to {activity}.')
 						self.save_settings()
 						continue
+				print('Unknown command')
+		finally:
+			self.client.loop.create_task(self.client.logout())
 
-					activity = line.split(maxsplit=1)[1]
-					self.settings['activity'] = activity
-					self.client.loop.create_task(self.client.change_presence(activity=discord.Game(activity)))
-					self.logger.info(f'Activity set to {activity}.')
-					self.save_settings()
+	async def console_init(self):
+		await self.client.loop.run_in_executor(None, self.console)
+
+	async def inactivity(self):
+		while True:
+			await asyncio.sleep(3600)
+			now = time.time()
+
+			for guild in self.client.guilds:
+				guild_dat = self.data.setdefault('servers', {}).setdefault(str(guild.id), {})
+				inactive_time = guild_dat.setdefault('settings', {}).setdefault('inactive', 0)
+				if inactive_time == 0:
 					continue
-			print('Unknown command')
-		self.client.loop.create_task(self.client.logout())
+
+				members_dict = guild_dat.setdefault('members', {})
+				roles_dict = guild_dat.setdefault('roles', {})
+
+				to_add = {int(k) for k, v in roles_dict.items() if v.setdefault('add_on_inactive', False)}
+				to_rem = set(sum([v.setdefault('remove_when_this_role_add', []) for k, v in roles_dict.items() if v.setdefault('add_on_inactive', False)], []))
+
+				for member in guild.members:
+					if now - members_dict.setdefault(str(member.id), {}).setdefault('last_msg', now) > inactive_time * 86400:
+						for role_id in to_add:
+							role = guild.get_role(role_id)
+							if role != None and role not in member.roles:
+								await member.add_roles(role, reason='Inactive')
+
+						for role_id in to_rem:
+							role = guild.get_role(role_id)
+							if role != None and role in member.roles:
+								await member.remove_roles(role, reason='Inactive')
+
 	
 	async def saving(self):
-		await self.client.loop.run_in_executor(None, self.console);
 		while True:
 			await asyncio.sleep(3600)
 			self.save_data()
@@ -124,7 +161,6 @@ class Rengetsu:
 			self.logger.info('Settings successfully saved')
 		except OSError as e:
 			self.logger.error('Could not save settings file:', e)
-
 
 	def load_listeners(self):
 		@self.client.event
@@ -178,30 +214,46 @@ class Rengetsu:
 			if message.author.bot:
 				return
 
-			if message.content == 'stop':
-				await self.client.logout()
-				return
-
 			for type_command in self.type_commands:
 				if (message.channel.id, message.author.id) in type_command.tc_id_list:
 					await type_command(message, self)
 					await self.client.http.delete_message(message.channel.id, message.id)
 					return
 
+			if message.guild != None:
+				user_dat = self.data.setdefault('servers', {}).setdefault(str(message.guild.id), {}).setdefault('members', {}).setdefault(str(message.author.id), {})
+				user_dat['last_msg'] = time.time()
+
+				if not message.author.guild_permissions.administrator:
+					roles = [int(k) for k, v in self.data['servers'][str(message.guild.id)].setdefault('roles', {}).items() if v.setdefault('bot_permission', False)]
+					if len(roles) > 0:
+						no_perms = True
+						for role_id in roles:
+							role = message.guild.get_role(role_id)
+							if role in message.author.roles:
+								no_perms = False
+								break
+						if no_perms:
+							return
+
 			return_message = []
 
 			cmds = [line.strip()[1:] for line in message.content.split('\n') if line.strip().startswith('!')]
 
 			for line in cmds:
+				unknown = True
 				for command in self.commands:
 					if (command.condition(line)):
 						try:
 							ln = await command(line, message, {'len': len(cmds)}, self)
 							if (ln != None):
 								return_message.append(ln)
+							unknown = False
 							break
 						except commands.SkipCommand:
 							pass
+				if unknown:
+					return_message.append('**[Unknown Command]**')
 
 			send = None
 			if (len(return_message) == 1):
