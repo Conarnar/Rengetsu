@@ -7,6 +7,7 @@ import asyncio
 import threading
 import json
 import time
+import console
 from datetime import datetime
 
 status_dict = {'online': discord.Status.online, 'idle': discord.Status.idle, 'dnd': discord.Status.dnd, 'invis': discord.Status.invisible}
@@ -37,6 +38,8 @@ class Rengetsu:
 
 		self.settings_file = 'reng_dat/settings.txt'
 		self.settings = settings
+
+		self.channel_id = None
 
 		try:
 			if (os.path.isfile(self.data_file)):
@@ -70,44 +73,8 @@ class Rengetsu:
 
 		self.save_data()
 
-	def console(self):
-		try:
-			while True:
-				line = input()
-				args = line.split()
-				if len(args) > 0:
-					if args[0] == 'stop':
-						break
-					elif args[0] == 'status':
-						if len(args) == 2:
-							if args[1] in status_dict:
-								self.settings['status'] = args[1]
-								self.client.loop.create_task(self.client.change_presence(status=status_dict[args[1]]))
-								self.logger.info(f'Status set to {args[1]}.')
-								self.save_settings()
-								continue
-						print('[Usage] status (online|idle|dnd|invis)')
-						continue
-					elif args[0] == 'play':
-						if len(args) == 1:
-							self.client.loop.create_task(self.client.change_presence(activity=None))
-							self.settings['activity'] = ''
-							self.logger.info('Activity removed.')
-							self.save_settings()
-							continue
-
-						activity = line.split(maxsplit=1)[1]
-						self.settings['activity'] = activity
-						self.client.loop.create_task(self.client.change_presence(activity=discord.Game(activity)))
-						self.logger.info(f'Activity set to {activity}.')
-						self.save_settings()
-						continue
-				print('Unknown command')
-		finally:
-			self.client.loop.create_task(self.client.logout())
-
 	async def console_init(self):
-		await self.client.loop.run_in_executor(None, self.console)
+		await self.client.loop.run_in_executor(None, console.console, self)
 
 	async def inactivity(self):
 		while True:
@@ -211,6 +178,9 @@ class Rengetsu:
 
 		@self.client.event
 		async def on_message(message):
+			if self.channel_id == message.channel.id:
+				print(f'[{message.guild.name}#{message.channel.id}] {message.author}: {message.content}')
+
 			if message.author.bot:
 				return
 
