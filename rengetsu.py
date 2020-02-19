@@ -10,8 +10,6 @@ import time
 import console
 from datetime import datetime
 
-status_dict = {'online': discord.Status.online, 'idle': discord.Status.idle, 'dnd': discord.Status.dnd, 'invis': discord.Status.invisible}
-
 class Rengetsu:
 	def __init__(self, settings):
 		file = filename=datetime.now().strftime('reng_log/rengetsu_%Y_%m_%d_%H_%M_%S_%f.log')

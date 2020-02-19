@@ -1,5 +1,7 @@
 import discord
 
+status_dict = {'online': discord.Status.online, 'idle': discord.Status.idle, 'dnd': discord.Status.dnd, 'invis': discord.Status.invisible}
+
 def console(reng):
 	guild = None
 	channel = None
@@ -81,7 +83,7 @@ def console(reng):
 						if channel != None:
 							print(f'Left channel {channel.name}')
 							channel = None
-							self.channel_id = 0
+							reng.channel_id = None
 							continue
 
 						if guild != None:
