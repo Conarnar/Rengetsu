@@ -122,6 +122,6 @@ async def command_calculate(line, message, meta, reng):
 		else:
 			return f'Result: **{calc.value()}**.'
 	except ValueError as e:
-		return f'**[Syntax Error]** {e}.'
+		return f'**[Error]** SyntaxError: {e}.'
 	except OverflowError as e:
-		return f'**[Overflow Error]** {e}.'
+		return f'**[Error]** OverflowError: {e}.'

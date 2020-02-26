@@ -1,5 +1,8 @@
 import re
 
+user_mention_regex = re.compile(r'<@!?(\d+)>')
+channel_mention_regex = re.compile(r'<#(\d+)>')
+
 time_regex = re.compile(r'(\d+)([dhms])')
 time_to_seconds = {'d': 86400, 'h': 3600, 'm': 60, 's': 1}
 

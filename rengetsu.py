@@ -10,6 +10,8 @@ import time
 import console
 from datetime import datetime
 
+status_dict = {'online': discord.Status.online, 'idle': discord.Status.idle, 'dnd': discord.Status.dnd, 'invis': discord.Status.invisible}
+
 class Rengetsu:
 	def __init__(self, settings):
 		file = filename=datetime.now().strftime('reng_log/rengetsu_%Y_%m_%d_%H_%M_%S_%f.log')
@@ -79,29 +81,31 @@ class Rengetsu:
 			await asyncio.sleep(3600)
 			now = time.time()
 
+			users_dict = self.data.setdefault('users', {})
+
 			for guild in self.client.guilds:
 				guild_dat = self.data.setdefault('servers', {}).setdefault(str(guild.id), {})
 				inactive_time = guild_dat.setdefault('settings', {}).setdefault('inactive', 0)
 				if inactive_time == 0:
 					continue
-
-				members_dict = guild_dat.setdefault('members', {})
+				
 				roles_dict = guild_dat.setdefault('roles', {})
 
 				to_add = {int(k) for k, v in roles_dict.items() if v.setdefault('add_on_inactive', False)}
 				to_rem = set(sum([v.setdefault('remove_when_this_role_add', []) for k, v in roles_dict.items() if v.setdefault('add_on_inactive', False)], []))
 
-				for member in guild.members:
-					if now - members_dict.setdefault(str(member.id), {}).setdefault('last_msg', now) > inactive_time * 86400:
-						for role_id in to_add:
-							role = guild.get_role(role_id)
-							if role != None and role not in member.roles:
-								await member.add_roles(role, reason='Inactive')
+				if len(to_add) > 0:
+					for member in guild.members:
+						if now - users_dict.setdefault(str(member.id), {}).setdefault('last_msg', now) > inactive_time * 86400:
+							for role_id in to_add:
+								role = guild.get_role(role_id)
+								if role != None and role not in member.roles:
+									await member.add_roles(role, reason='Inactive')
 
-						for role_id in to_rem:
-							role = guild.get_role(role_id)
-							if role != None and role in member.roles:
-								await member.remove_roles(role, reason='Inactive')
+							for role_id in to_rem:
+								role = guild.get_role(role_id)
+								if role != None and role in member.roles:
+									await member.remove_roles(role, reason='Inactive')
 
 	
 	async def saving(self):
@@ -168,11 +172,27 @@ class Rengetsu:
 
 		@self.client.event
 		async def on_member_join(member):
-			for k, v in self.data.setdefault('servers', {}).setdefault(str(member.guild.id), {}).setdefault('roles', {}).items():
+			server_dat = self.data.setdefault('servers', {}).setdefault(str(member.guild.id), {})
+			
+			for channel_id in server_dat.setdefault('settings', {}).setdefault('logging', []):
+				channel = member.guild.get_channel(channel_id)
+				if channel != None:
+					await channel.send(f'{member.mention} (Username: {member}) has joined the server.')
+
+			for k, v in server_dat.setdefault('roles', {}).items():
 				if v.setdefault('add_on_join', False):
 					role = member.guild.get_role(int(k))
 					if role != None:
 						await member.add_roles(role, reason='Added on join')
+
+		@self.client.event
+		async def on_member_remove(member):
+			server_dat = self.data.setdefault('servers', {}).setdefault(str(member.guild.id), {})
+			
+			for channel_id in server_dat.setdefault('settings', {}).setdefault('logging', []):
+				channel = member.guild.get_channel(channel_id)
+				if channel != None:
+					await channel.send(f'{member.mention} (Username: {member}) has left the server.')
 
 		@self.client.event
 		async def on_message(message):
@@ -188,10 +208,10 @@ class Rengetsu:
 					await self.client.http.delete_message(message.channel.id, message.id)
 					return
 
-			if message.guild != None:
-				user_dat = self.data.setdefault('servers', {}).setdefault(str(message.guild.id), {}).setdefault('members', {}).setdefault(str(message.author.id), {})
-				user_dat['last_msg'] = time.time()
+			user_dat = self.data.setdefault('users', {}).setdefault(str(message.author.id), {})
+			user_dat['last_msg'] = time.time()
 
+			if message.guild != None:
 				if not message.author.guild_permissions.administrator:
 					roles = [int(k) for k, v in self.data['servers'][str(message.guild.id)].setdefault('roles', {}).items() if v.setdefault('bot_permission', False)]
 					if len(roles) > 0:

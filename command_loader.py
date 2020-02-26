@@ -4,6 +4,7 @@ import command_here
 import command_role
 import command_timer
 import command_settings
+import command_salt
 
 def load_commands(commands):
 	commands.append(command_dice.command_dice)
@@ -16,6 +17,7 @@ def load_commands(commands):
 	commands.append(command_role.command_request)
 	commands.append(command_timer.command_timer)
 	commands.append(command_settings.command_settings)
+	commands.append(command_salt.command_salt)
 
 def load_menus(menus):
 	menus.append(command_role.menu_main)

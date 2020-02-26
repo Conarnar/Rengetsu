@@ -354,13 +354,13 @@ def generate_message(role_dat, extras, reng, ended=None):
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'role'))
 async def command_role(line, message, meta, reng):
 	if message.guild == None:
-		return '**[Channel Error]** This command is only available in server channels.'
+		return '**[Error]** This command is only available in server channels.'
 
 	if not message.author.guild_permissions.administrator:
-		return '**[Permission Error]** You do not have permission to use this command.'
+		return '**[Error]** You do not have permission to use this command.'
 
 	if meta['len'] != 1:
-		return '**[Message Error]** This command cannot be used with other commands in the same message.'
+		return '**[Error]** This command cannot be used with other commands in the same message.'
 
 	args = line.split(maxsplit=1)
 
@@ -370,7 +370,7 @@ async def command_role(line, message, meta, reng):
 	roles = [role for role in message.guild.roles if role.name == args[1]]
 
 	if len(roles) == 0:
-		return f'**[Argument Error]** No roles found with that name ({args[1]}).'
+		return f'**[Error]** No roles found with that name ({args[1]}).'
 
 	role_dat = reng.data.setdefault('servers', {}).setdefault(str(message.guild.id), {}).setdefault('roles', {}).setdefault(str(roles[0].id), {})
 	extras = {'mention': message.author.mention, 'name': roles[0].name, 'id': roles[0].id, 'guild_id': message.guild.id}
@@ -448,10 +448,10 @@ async def modify_cancel(message_id, reng):
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'request', 'requestrole'))
 async def command_request(line, message, meta, reng):
 	if message.guild == None:
-		return '**[Channel Error]** This command is only available in server channels.'
+		return '**[Error]** This command is only available in server channels.'
 
 	if meta['len'] != 1:
-		return '**[Message Error]** This command cannot be used with other commands in the same message.'
+		return '**[Error]** This command cannot be used with other commands in the same message.'
 
 	args = line.split(maxsplit=1)
 	
@@ -463,22 +463,22 @@ async def command_request(line, message, meta, reng):
 		duration = util.parse_time(args2[2])
 
 		if duration == 0:
-			return f'**[Argument Error]** No roles found with that name ({args[1]}).'
+			return f'**[Error]** No roles found with that name ({args[1]}).'
 
 		roles = [role for role in message.guild.roles if role.name == args2[0]]
 
 		if len(roles) == 0:
-			return f'**[Argument Error]** No roles found with that name ({args2[0]}).'
+			return f'**[Error]** No roles found with that name ({args2[0]}).'
 
 	roles_dict = reng.data.setdefault('servers', {}).setdefault(str(message.guild.id), {}).setdefault('roles', {})
 	
 	if str(roles[0].id) not in roles_dict:
-		return f'**[Argument Error]** Role ({roles[0].name}) is not requstable.'
+		return f'**[Error]** Role ({roles[0].name}) is not requstable.'
 
 	role_dat = roles_dict[str(roles[0].id)]
 
 	if not role_dat.setdefault('requestable', False):
-		return f'**[Argument Error]** Role ({roles[0].name}) is not requstable.'
+		return f'**[Error]** Role ({roles[0].name}) is not requstable.'
 
 	if role_dat.setdefault('requestable_temp', False):
 		if roles[0] in message.author.roles:
@@ -495,7 +495,7 @@ async def command_request(line, message, meta, reng):
 				return f'Your {roles[0].name} role has been removed'
 		
 		if duration == None:
-			return f'**[Argument Error]** Role ({roles[0].name}) can only be temporarily requstable. Please add a time argument.'
+			return f'**[Error]** Role ({roles[0].name}) can only be temporarily requstable. Please add a time argument.'
 
 		if role_dat.setdefault('requestable_agree', '') != '':
 			return '**[Not Implemented]**'
@@ -518,14 +518,20 @@ async def command_request(line, message, meta, reng):
 		
 
 		if duration != None:
-			return f'**[Argument Error]** Role ({roles[0].name}) cannot be temporarily requstable. Please remove the time argument.'
+			return f'**[Error]** Role ({roles[0].name}) cannot be temporarily requstable. Please remove the time argument.'
 
 		if role_dat.setdefault('requestable_agree', '') != '':
 			if any(v['user_id'] == message.author.id for v in agreement_menu_dict.values()):
-				return '**[Permission Error]** You already have an agreement pending. You cannot request this role until you have accepted or declined your previous agreement.'
-			await message.author.create_dm()
+				return '**[Error]** You already have an agreement pending. You cannot request this role until you have accepted or declined your previous agreement.'
+			
 			agree_text = f'{message.author.mention} Agreement for role {roles[0].name} in server {message.guild.name}:\n' + role_dat['requestable_agree']
-			mes = await message.author.dm_channel.send(agree_text)
+
+			try:
+				await message.author.create_dm()
+				mes = await message.author.dm_channel.send(agree_text)
+			except discord.errors.Forbidden:
+				return f'**[Error]** Could not send private message.'
+			
 			await mes.add_reaction(emoji.CHECKMARK)
 			await mes.add_reaction(emoji.CROSSMARK)
 			agreement_pending_dict[mes.id] = {'role_id': roles[0].id, 'guild_id': message.guild.id, 'user_id': message.author.id, 'agreement': agree_text}
