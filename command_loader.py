@@ -5,19 +5,21 @@ import command_role
 import command_timer
 import command_settings
 import command_salt
+import command_help
 
 def load_commands(commands):
 	commands.append(command_dice.command_dice)
 	commands.append(command_dice.command_multiroll)
 	commands.append(command_dice.command_multiroll_short)
 	commands.append(command_dice.command_percent)
-	commands.append(command_math.command_calculate)
+	commands.append(command_math.command_math)
 	commands.append(command_here.command_here)
 	commands.append(command_role.command_role)
 	commands.append(command_role.command_request)
 	commands.append(command_timer.command_timer)
 	commands.append(command_settings.command_settings)
 	commands.append(command_salt.command_salt)
+	commands.append(command_help.command_help)
 
 def load_menus(menus):
 	menus.append(command_role.menu_main)

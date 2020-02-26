@@ -1,7 +1,7 @@
 import commands
 import random
 
-@commands.command(condition=lambda line : commands.first_arg_match(line, 'dice', 'd', 'roll', 'rng'))
+@commands.command(condition=lambda line : commands.first_arg_match(line, 'dice', 'd'))
 async def command_dice(line, message, meta, reng):
 	args = line.split()
 	if len(args) == 2:
@@ -27,7 +27,7 @@ async def command_dice(line, message, meta, reng):
 	return '**[Usage]** !dice <range> [range]'
 
 
-@commands.command(condition=lambda line : commands.first_arg_match(line, 'multiroll', 'multi'))
+@commands.command(condition=lambda line : commands.first_arg_match(line, 'multi'))
 async def command_multiroll(line, message, meta, reng):
 	args = line.split()
 	if len(args) == 3:
