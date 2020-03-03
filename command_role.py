@@ -549,7 +549,7 @@ def on_login(reng):
 			roles = reng.data['servers'][guild_id].setdefault('roles', {})
 
 			if type(roles) == list:
-				reng.data['servers'][guild_id] = {} #remove
+				reng.data['servers'][guild_id]['roles'] = {} #remove
 
 			reng.data['servers'][guild_id]['roles'] = {k: v for k, v in roles.items() if guild.get_role(int(k)) != None}
 
