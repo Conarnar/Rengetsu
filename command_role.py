@@ -546,7 +546,7 @@ def on_login(reng):
 	for guild_id in reng.data.setdefault('servers', {}):
 		guild = reng.client.get_guild(int(guild_id))
 		if guild != None:
-			roles = reng.data['servers'][guild_id].setdefault('roles', [])
+			roles = reng.data['servers'][guild_id].setdefault('roles', {})
 			reng.data['servers'][guild_id]['roles'] = {k: v for k, v in roles.items() if guild.get_role(int(k)) != None}
 
 def on_load(reng):
