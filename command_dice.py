@@ -64,7 +64,7 @@ async def command_multiroll(line, message, meta, reng):
 			return f'**[Error]** Arg 2 ({args[2]}) must be an integer.'
 
 		try:
-			i3 = int(args[2])
+			i3 = int(args[3])
 		except ValueError:
 			return f'**[Error]** Arg 3 ({args[3]}) must be an integer.'
 
