@@ -65,6 +65,7 @@ class Rengetsu:
 			loop.create_task(self.console_init())
 			loop.create_task(self.saving())
 			loop.create_task(self.inactivity())
+			loop.create_task(self.salt_remind())
 			loop.run_until_complete(self.client.start(self.token))
 		except KeyboardInterrupt:
 			loop.run_until_complete(self.client.logout())
@@ -106,6 +107,25 @@ class Rengetsu:
 								role = guild.get_role(role_id)
 								if role != None and role in member.roles:
 									await member.remove_roles(role, reason='Inactive')
+
+	async def salt_remind(self):
+		while True:
+			await asyncio.sleep(1)
+			now = time.time()
+
+			for user_id, user_dat in self.data.setdefault('users', {}).items():
+				salt_dat = user_dat.setdefault('salt', {})
+
+				if salt_dat.setdefault('remind', False) and not salt_dat.setdefault('reminded', False) and now - salt_dat.setdefault('last_claim', 0) > command_loader.command_salt.cooldown:
+					salt_dat['reminded'] = True
+
+					try:
+						user = self.client.get_user(int(user_id))
+						if  user != None:
+							await user.create_dm()
+							await user.dm_channel.send(f'{user.mention} Your daily salt is ready to be claimed. Type `!salt claim` to do so.')
+					except discord.errors.Forbidden:
+						pass
 
 	
 	async def saving(self):

@@ -3,7 +3,7 @@ import time
 import util
 import discord
 
-cooldown = 21600
+cooldown = 86400
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'salt'))
 async def command_salt(line, message, meta, reng):
@@ -36,9 +36,10 @@ async def command_salt(line, message, meta, reng):
 
 			return ret + '.'
 		else:
-			salt_dat['salt'] = salt_dat.setdefault("salt", 0) + 500
+			salt_dat['salt'] = salt_dat.setdefault("salt", 0) + 2000
 			salt_dat['last_claim'] = now
-			return f'You gained 500 salt. You now have {salt_dat["salt"]} salt.'
+			salt_dat['reminded'] = False
+			return f'You gained 2000 salt. You now have {salt_dat["salt"]} salt.'
 	elif args[1] == 'gift':
 		if len(args) != 4:
 			return '**[Usage]** !salt gift <mention> <amount>'
@@ -80,6 +81,9 @@ async def command_salt(line, message, meta, reng):
 			pass
 
 		return f'You gifted {amount} salt to {user.mention}. You now have {salt_dat["salt"]} salt.'
+	elif args[1] == 'remind':
+		salt_dat['remind'] = not salt_dat.setdefault('remind', False)
+		return f'You have turned o{"n" if salt_dat["remind"] else "ff"} daily claim reminders.'
 
 
-	return '**[Usage]** !salt [claim|gift]'
+	return '**[Usage]** !salt [claim|gift|remind]'
