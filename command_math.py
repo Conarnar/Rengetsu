@@ -115,9 +115,9 @@ async def command_math(line, message, meta, reng):
 		calc = Calculator(line.strip()[5:])
 		drs = calc.dicerolls()
 		if len(drs) > 0:
-			return f'Result: **{calc.value()}** [' + ' | '.join(drs) + '].'
+			return f'Result: **{round(calc.value(), 10)}** [' + ' | '.join(drs) + '].'
 		else:
-			return f'Result: **{calc.value()}**.'
+			return f'Result: **{round(calc.value(), 10)}**.'
 	except ValueError as e:
 		return f'**[Error]** SyntaxError: {e}.'
 	except OverflowError as e:
