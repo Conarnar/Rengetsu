@@ -2,14 +2,11 @@ import math
 import random
 import commands
 
-def iabs(i):
-	return math.fabs(i) if type(i) == float else int(math.fabs(i))
-
 functions = {'sqrt': math.sqrt, 'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'arcsin': math.asin, 'arccos': math.acos, 'arctan': math.atan,
 'sinh': math.sinh, 'cosh': math.cosh, 'tanh': math.tanh, 'arcsinh': math.asinh, 'arccosh': math.acosh, 'arctanh': math.atanh,
 'asin': math.asin, 'acos': math.acos, 'atan': math.atan, 'asinh': math.asinh, 'acosh': math.acosh, 'atanh': math.atanh,
 'ceil': math.ceil, 'floor': math.floor, 'trunc': math.trunc,
-'ln': math.log, 'abs': iabs}
+'ln': math.log, 'abs': abs}
 
 class Calculator:
 	def __init__(self, line):
@@ -85,7 +82,7 @@ class Calculator:
 				self._next_char()
 			substr = self._line[startPos:self._pos]
 			if '.' in substr:
-				x = double(substr)
+				x = float(substr)
 			else:
 				x = int(substr)
 		elif ord('a') <= ord(self._char) <= ord('z'):
