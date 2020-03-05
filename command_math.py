@@ -57,7 +57,12 @@ class Calculator:
 			if self._eat('*'):
 				x *= self._parse_factor()
 			elif self._eat('/'):
-				x /= self._parse_factor()
+				y = self._parse_factor()
+
+				if type(x) == int and type(y) == int and x % y == 0:
+					x //= y
+				else:
+					x /= y
 			elif self._eat('%'):
 				x %= self._parse_factor()
 			else:
@@ -98,7 +103,7 @@ class Calculator:
 			raise ValueError(f'Unexpected: {self._char}')
 
 		if self._eat('^'):
-			x = math.pow(x, self._parse_factor())
+			x **= self._parse_factor()
 		elif self._eat('d'):
 			z = math.floor(self._parse_factor())
 			v = math.floor(x)
