@@ -116,10 +116,11 @@ async def command_math(line, message, meta, reng):
 			i1 = int(match.group(1))
 			i2 = int(match.group(2))
 
-			if i1 <= 0:
-				i1 = 0
-			elif i1 > 100:
-				i1 = 100
+			if i1 > 100:
+				return f'**[Error]** Diceroll Error [{match.group()}], Arg 1 ({i1}) cannot be greater than 100.'
+
+			if i2 <= 0:
+				return f'**[Error]** Diceroll Error [{match.group()}], Arg 2 ({i2}) must be greater than 0.'
 
 			if match.group(4) != None:
 				if match.group(4) == '':
@@ -134,7 +135,7 @@ async def command_math(line, message, meta, reng):
 				dropped = set(sorted(range(i1), key=lambda i: res[i], reverse=match.group(3) != 'l')[:i3])
 
 			total = sum(res[i] for i in range(i1) if i not in dropped)
-			drs.append(f"{i1}d{i2}{'' if match.group(3) == None else 'd' + match.group(3) + str(i3)}: {', '.join((('~~' if i in dropped else '') + str(res[i]) + ('~~' if i in dropped else '')) for i in range(i1))}, Total: {total}")
+			drs.append(f"{i1}d{i2}{'' if match.group(3) == None else 'd' + match.group(3) + str(i3)}: {', '.join((('~~' if i in dropped else '') + str(res[i]) + ('~~' if i in dropped else '')) for i in range(i1))} Total: {total}")
 			expr = expr[:match.start()] + f' {total} ' + expr[match.end():]
 			match = mr_re.search(expr)
 

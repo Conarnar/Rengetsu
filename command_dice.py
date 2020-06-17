@@ -89,6 +89,9 @@ async def command_multiroll_short(line, message, meta, reng):
 		if i1 <= 0 or i1 > 100:
 			return f'**[Error]** Arg 1 ({i1}) must be a positive integer 100 or less.'
 
+		if i2 <= 0:
+			return f'**[Error]** Arg 2 ({i2}) must be greater than 0.'
+
 		if match.group(4) != None:
 			if match.group(4) == '':
 				i3 = 1
