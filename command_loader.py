@@ -13,6 +13,7 @@ def load_commands(commands):
 	commands.append(command_dice.command_multiroll_short)
 	commands.append(command_dice.command_percent)
 	commands.append(command_math.command_math)
+	commands.append(command_math.command_mathf)
 	commands.append(command_here.command_here)
 	commands.append(command_role.command_role)
 	commands.append(command_role.command_request)

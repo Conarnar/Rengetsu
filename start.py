@@ -14,7 +14,7 @@ if __name__ == '__main__':
 			with open(file) as f:
 				settings = json.load(f)
 				start(settings)
-		except OSError:
+		except OSError as e:
 			print('Could not read settings file:', e)
 	else:
 		try:

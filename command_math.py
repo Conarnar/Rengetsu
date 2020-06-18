@@ -7,23 +7,126 @@ functions = {'sqrt': math.sqrt, 'sin': math.sin, 'cos': math.cos, 'tan': math.ta
 'sinh': math.sinh, 'cosh': math.cosh, 'tanh': math.tanh, 'arcsinh': math.asinh, 'arccosh': math.acosh, 'arctanh': math.atanh,
 'asin': math.asin, 'acos': math.acos, 'atan': math.atan, 'asinh': math.asinh, 'acosh': math.acosh, 'atanh': math.atanh,
 'ceil': math.ceil, 'floor': math.floor, 'trunc': math.trunc,
-'ln': math.log, 'abs': abs}
+'ln': math.log, 'abs': abs, 'rand': random.randrange}
 
 mr_re = re.compile(r'(\d+)d(\d+)(?:d([lh])(\d*))?')
+var_re = re.compile(r'^[_a-zA-Z][_\w]*')
 
 class Calculator:
-	def __init__(self, line):
-		self._line = line.lower()
-		self._pos = -1
-		self._char = '\0'
-		self._value = self._parse()
+	def __init__(self, line, funcs={}, consts={}, args={}, yields=None, array=None):
+		self._funcs = funcs
+		self._consts = consts
+		self._args = args
+		self._yield = [] if yields == None else yields
+		self._array = [0] * 100 if array == None else array
+		self._ans = []
+		self._exprs = [expr.strip() for expr in line.split(';')]
+		self._value = None
+		self._calculate()
+
+	def _calculate(self):
+		blocks = []
+		line = 0
+		loops = 0
+		while line < len(self._exprs):
+			if loops > 1000:
+				raise OverflowError('Overflow Error: Max loops reached')
+			loops += 1
+
+			expr = self._exprs[line]
+
+			match = var_re.match(expr)
+			command = None if match == None else match.group()
+			
+			if command == 'end':
+				if len(blocks) == 0:
+					raise ValueError('Missing start of block')
+				last = blocks.pop()
+				if last[0] == 'end_on' or last[0] == 'skip_until':
+					line += 1
+					continue
+				elif last[0] == 'loop':
+					line = last[1]
+					continue
+			else:
+				if len(blocks) > 0:
+					if blocks[-1][0] == 'end_on':
+						if command in blocks[-1][1]:
+							blocks.pop()
+							blocks.append(('skip_until', []))
+					elif blocks[-1][0] == 'skip_until':
+						if command in blocks[-1][1]:
+							if command == 'else':
+								blocks.pop()
+								blocks.append(('end_on', []))
+								line += 1
+								continue
+							elif command == 'elif':
+								self._expr = expr[match.end():]
+								if self._parse():
+									blocks.pop()
+									blocks.append(('end_on', ['else', 'elif']))
+									line += 1
+									continue
+								else:
+									line += 1
+									continue
+						else:
+							line += 1
+							continue
+
+			if command == 'return':
+				self._expr = expr[match.end():]
+				if not self._expr.isspace() and self._expr != '':
+					self._value = self._parse()
+
+				break
+			elif command == 'yield':
+				print(expr)
+				self._expr = expr[match.end():]
+				value = self._parse()
+				self._ans.append(value)
+				self._yield.append(value)
+				line += 1
+				continue
+			elif command == 'if':
+				self._expr = expr[match.end():]
+				if self._parse():
+					blocks.append(('end_on', ['else', 'elif']))
+					line += 1
+					continue
+				else:
+					line += 1
+					blocks.append(('skip_until', ['else', 'elif']))
+					continue
+			elif command == 'while':
+				self._expr = expr[match.end():]
+				if self._parse():
+					blocks.append(('loop', line))
+					line += 1
+					continue
+				else:
+					line += 1
+					blocks.append(('skip_until', []))
+					continue
+			else:
+				self._expr = expr
+				self._ans.append(self._parse())
+				line += 1
+				continue
 
 	def value(self):
 		return self._value
 
+	def answers(self):
+		return self._ans
+
+	def yields(self):
+		return self._yield
+
 	def _next_char(self):
 		self._pos += 1
-		self._char = self._line[self._pos] if self._pos < len(self._line) else '\0';
+		self._char = self._expr[self._pos] if self._pos < len(self._expr) else '\0';
 
 	def _eat(self, char_to_eat):
 		while self._char.isspace():
@@ -34,13 +137,135 @@ class Calculator:
 		return False
 
 	def _parse(self):
+		self._pos = -1
 		self._next_char()
-		x = self._parse_expression()
-		if self._pos < len(self._line):
-			raise ValueError(f'Unexpected: {self._char}')
+		x = self._parse_start()
+		if self._pos < len(self._expr):
+			raise ValueError(f'Syntax Error: Unexpected {self._char}')
 		return x
 
-	def _parse_expression(self):
+	def _parse_start(self, short=False):
+		return self._parse_or(short)
+
+	def _parse_or(self, short=False):
+		if short:
+			self._parse_and(True)
+			while True:
+				if self._eat('|'):
+					if self._char == '|':
+						self._next_char()
+						self._parse_and(True)
+					else:
+						raise ValueError(f'Syntax Error: Did you mean ||?')
+				else:
+					return
+
+		x = self._parse_and()
+		while True:
+			if self._eat('|'):
+				if self._char == '|':
+					self._next_char()
+
+					if x:
+						x = 1
+						self._parse_and(True)
+					else:
+						x = 1 if self._parse_and() else 0
+				else:
+					raise ValueError(f'Syntax Error: Did you mean ||?')
+			else:
+				return x
+
+	def _parse_and(self, short=False):
+		if short:
+			self._parse_ineq(True)
+			while True:
+				if self._eat('|'):
+					if self._char == '|':
+						self._next_char()
+						self._parse_ineq(True)
+					else:
+						raise ValueError(f'Syntax Error: Did you mean &&?')
+				else:
+					return
+
+		x = self._parse_ineq()
+		while True:
+			if self._eat('&'):
+				if self._char == '&':
+					self._next_char()
+
+					if not x:
+						x = 0
+						self._parse_ineq(True)
+					else:
+						x = 1 if self._parse_ineq() else 0
+				else:
+					raise ValueError(f'Syntax Error: Did you mean &&?')
+			else:
+				return x
+
+	def _parse_ineq(self, short=False):
+		if short:
+			self._parse_expression(True)
+			while True:
+				if self._eat('<') or self._eat('>'):
+					if self._char == '=':
+						self._next_char()
+					self._parse_expression(True)
+				elif self._eat('='):
+					if self._char == '=':
+						self._next_char()
+						self._parse_expression(True)
+					else:
+						raise ValueError(f'Syntax Error: Did you mean ==?')
+				elif self._eat('!'):
+					if self._char == '=':
+						self._next_char()
+						self._parse_expression(True)
+					else:
+						raise ValueError(f'Syntax Error: Did you mean !=?')
+				else:
+					return
+
+		x = self._parse_expression()
+		while True:
+			if self._eat('<'):
+				if self._char == '=':
+					self._next_char()
+					x = 1 if x <= self._parse_expression() else 0
+				else:
+					x = 1 if x < self._parse_expression() else 0
+			elif self._eat('>'):
+				if self._char == '=':
+					self._next_char()
+					x = 1 if x >= self._parse_expression() else 0
+				else:
+					x = 1 if x > self._parse_expression() else 0
+			elif self._eat('='):
+				if self._char == '=':
+					self._next_char()
+					x = 1 if x == self._parse_expression() else 0
+				else:
+					raise ValueError(f'Syntax Error: Did you mean ==?')
+			elif self._eat('!'):
+				if self._char == '=':
+					self._next_char()
+					x = 1 if x != self._parse_expression() else 0
+				else:
+					raise ValueError(f'Syntax Error: Did you mean !=?')
+			else:
+				return x
+
+	def _parse_expression(self, short=False):
+		if short:
+			self._parse_term(True)
+			while True:
+				if self._eat('+') or self._eat('-'):
+					self._parse_term(True)
+				else:
+					return
+
 		x = self._parse_term()
 		while True:
 			if self._eat('+'):
@@ -50,7 +275,15 @@ class Calculator:
 			else:
 				return x
 
-	def _parse_term(self):
+	def _parse_term(self, short=False):
+		if short:
+			self._parse_factor(True)
+			while True:
+				if self._eat('*') or self._eat('/') or self._eat('%'):
+					self._parse_factor(True)
+				else:
+					return
+
 		x = self._parse_factor()
 		while True:
 			if self._eat('*'):
@@ -67,44 +300,187 @@ class Calculator:
 			else:
 				return x
 
-	def _parse_factor(self):
+	def _parse_factor(self, short=False):
+		if short:
+			self._parse_factor_short()
+			return
+
 		if self._eat('+'):
 			return self._parse_factor()
 		if self._eat('-'):
 			return -self._parse_factor()
+		if self._eat('!'):
+			return 1 if not self._parse_factor() else 0
 
 		startPos = self._pos
 
 		if self._eat('('):
-			x = self._parse_expression()
-			self._eat(')')
-		elif self._eat('|'):
-			x = abs(self._parse_expression())
-			self._eat('|')
+			x = self._parse_start()
+			if not self._eat(')'):
+				raise ValueError('Syntax Error: Missing )')
 		elif ord('0') <= ord(self._char) <= ord('9') or ord(self._char) == ord('.'):
 			while ord('0') <= ord(self._char) <= ord('9') or ord(self._char) == ord('.'):
 				self._next_char()
-			substr = self._line[startPos:self._pos]
+			substr = self._expr[startPos:self._pos]
 			if '.' in substr:
 				x = float(substr)
 			else:
 				x = int(substr)
-		elif ord('a') <= ord(self._char) <= ord('z'):
-			while ord('a') <= ord(self._char) <= ord('z'):
+		elif ord('a') <= ord(self._char.lower()) <= ord('z') or self._char == '_':
+			while ord('a') <= ord(self._char.lower()) <= ord('z') or ord('0') <= ord(self._char) <= ord('9') or self._char == '_':
 				self._next_char()
-			substr = self._line[startPos:self._pos]
-			x = self._parse_factor()
-			if substr in functions:
-				x = functions[substr](x)
+			substr = self._expr[startPos:self._pos]
+			
+			if substr in self._args:
+				x = self._args[substr]
+			elif substr in self._consts:
+				x = self._consts[substr]
+			elif substr in self._funcs:
+				args = self._parse_arguments()
+				if args == None:
+					raise ValueError('Syntax Error: Missing ( after function call')
+
+				func = self._funcs[substr]
+				params = func['args']
+
+				if len(args) != len(params):
+					raise ValueError(f'Syntax Error: Function {substr} takes {len(params)} argument{"" if len(params) == 1 else "s"} not {len(args)}')
+
+				x = Calculator(func['expr'], funcs=self._funcs, consts=self._consts, args={params[i]: args[i] for i in range(len(params))}, yields=self._yield).value()
+				if x == None:
+					x = 0
+			elif substr in functions:
+				args = self._parse_arguments()
+
+				if args == None:
+					raise ValueError('Syntax Error: Missing ( after function call')
+				if len(args) != 1:
+					raise ValueError(f'Syntax Error: Function {substr} takes 1 argument not {len(args)}')
+
+				x = functions[substr](args[0])
+			elif substr == 'ans':
+				args = self._parse_arguments()
+				
+				if args == None or len(args) == 0:
+					x = self._ans[-1]
+				else:
+					if len(args) != 1:
+						raise ValueError(f'Syntax Error: Function {substr} takes 1 argument not {len(args)}')
+					x = self._ans[math.floor(args[0])]
+			elif substr == 'sto':
+				args = self._parse_arguments()
+
+				if args == None:
+					raise ValueError('Syntax Error: Missing ( after function call')
+				if len(args) != 2:
+					raise ValueError(f'Syntax Error: Function {substr} takes 2 arguments not {len(args)}')
+
+				index = math.floor(args[0])
+
+				if index < 0 or index >= 100:
+					raise IndexError(f'Out of Bounds Error: Cannot store in index {index}')
+
+				x = args[1]
+				self._array[index] = x
+			elif substr == 'rcl':
+				args = self._parse_arguments()
+
+				if args == None:
+					raise ValueError('Syntax Error: Missing ( after function call')
+				if len(args) != 1:
+					raise ValueError(f'Syntax Error: Function {substr} takes 1 arguments not {len(args)}')
+
+				index = math.floor(args[0])
+
+				if index < 0 or index >= 100:
+					raise IndexError(f'Out of Bounds Error: Cannot recall from index {index}')
+
+				x = self._array[index]
 			else:
-				raise ValueError(f'Unknown function: {substr}')
+				raise ValueError(f'Name Error: Unknown name {substr}')
 		else:
-			raise ValueError(f'Unexpected: {self._char}')
+			if self._char == '\0':
+				raise ValueError('Syntax Error: Unexpected EOL')
+			raise ValueError(f'Syntax Error: Unexpected {self._char}')
 
 		if self._eat('^'):
-			x **= self._parse_factor()
+			exp = self._parse_factor()
+			if exp > 100:
+				raise OverflowError(f'Overflow Error: Exponent ({exp}) greater than 100')
+			x **= exp
 
 		return x
+
+	def _parse_factor_short(self):
+		if self._eat('+') or self._eat('-') or self._eat('!'):
+			self._parse_factor_short()
+			return
+
+		startPos = self._pos
+
+		if self._eat('('):
+			self._parse_start(True)
+			if not self._eat(')'):
+				raise ValueError('Syntax Error: Missing )')
+		elif ord('0') <= ord(self._char) <= ord('9') or ord(self._char) == ord('.'):
+			while ord('0') <= ord(self._char) <= ord('9') or ord(self._char) == ord('.'):
+				self._next_char()
+		elif ord('a') <= ord(self._char.lower()) <= ord('z') or self._char == '_':
+			while ord('a') <= ord(self._char.lower()) <= ord('z') or ord('0') <= ord(self._char) <= ord('9') or self._char == '_':
+				self._next_char()
+
+			substr = self._expr[startPos:self._pos]
+			
+			if substr in self._args or substr in self._consts:
+				pass
+			elif substr in self._funcs:
+				args = self._parse_arguments(True)
+				if args == None:
+					raise ValueError('Syntax Error: Missing ( after function call')
+
+				func = self._funcs[substr]
+				params = func['args']
+
+				if len(args) != len(params):
+					raise ValueError(f'Syntax Error: Function {substr} takes {len(params)} argument{"" if len(params) == 1 else "s"} not {len(args)}')
+			elif substr in functions:
+				args = self._parse_arguments(True)
+
+				if args == None:
+					raise ValueError('Syntax Error: Missing ( after function call')
+				if len(args) != 1:
+					raise ValueError(f'Syntax Error: Function {substr} takes 1 argument not {len(args)}')
+			elif substr == 'ans':
+				args = self._parse_arguments(True)
+				
+				if args != None and len(args) > 0:
+					raise ValueError(f'Syntax Error: Function {substr} takes 1 argument not {len(args)}')
+			else:
+				raise ValueError(f'Name Error: Unknown name {substr}')
+		else:
+			if self._char == '\0':
+				raise ValueError('Syntax Error: Unexpected EOL')
+			raise ValueError(f'Syntax Error: Unexpected {self._char}')
+
+		if self._eat('^'):
+			self._parse_factor(True)
+
+	def _parse_arguments(self, short=False):
+		if not self._eat('('):
+			return None
+
+		if self._eat(')'):
+			return []
+
+		args = [self._parse_start(short)]
+
+		while self._eat(','):
+			args.append(self._parse_start(short))
+
+		if not self._eat(')'):
+			raise ValueError('Syntax Error: Missing )')
+
+		return args
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'math', 'calc'))
 async def command_math(line, message, meta, reng):
@@ -139,14 +515,122 @@ async def command_math(line, message, meta, reng):
 			expr = expr[:match.start()] + f' {total} ' + expr[match.end():]
 			match = mr_re.search(expr)
 
+		mathf_dat = reng.data.setdefault('users', {}).setdefault(str(message.author.id), {}).setdefault('mathf', {})
+		func_dat = mathf_dat.setdefault('func', {})
+		const_dat = mathf_dat.setdefault('const', {})
 
-		calc = Calculator(expr)
+		calc = Calculator(expr, funcs=func_dat, consts=const_dat)
+		results = calc.yields()
+		if calc.value() != None:
+			results.append(calc.value())
+		if len(results) == 0:
+			if len(calc.answers()) == 0:
+				return '**[Error]** Nothing was calculated'
+			else:
+				results.append(calc.answers()[-1])
+
+		res = ', '.join('**' + str(round(val, 10)) + '**' for val in results)
 
 		if len(drs) > 0:
-			return f'Result: **{round(calc.value(), 10)}** [' + ' | '.join(drs) + '].'
+			return f'Result: {res} [' + ' | '.join(drs) + '].'
 		else:
-			return f'Result: **{round(calc.value(), 10)}**.'
-	except ValueError as e:
-		return f'**[Error]** SyntaxError: {e}.'
-	except OverflowError as e:
-		return f'**[Error]** OverflowError: {e}.'
+			return f'Result: {res}.'
+	except Exception as e:
+		return f'**[Error]** {e}.'
+
+
+@commands.command(condition=lambda line : commands.first_arg_match(line, 'mathf'))
+async def command_mathf(line, message, meta, reng):
+	args = line.split()
+
+	mathf_dat = reng.data.setdefault('users', {}).setdefault(str(message.author.id), {}).setdefault('mathf', {})
+	func_dat = mathf_dat.setdefault('func', {})
+	const_dat = mathf_dat.setdefault('const', {})
+
+	if len(args) <= 1:
+		return '**[Usage]** !mathf <func|const|del|list>'
+
+	if args[1] == 'func':
+		if len(args) == 2:
+			return '**[Usage]** !mathf func <name>([args,]) <expression>'
+
+		args = line.split(maxsplit=2)
+
+		arg_start = args[2].find('(')
+		arg_end = args[2].find(')')
+
+		if arg_start < 0 or (arg_start > arg_end and arg_end != -1):
+			return '**[Error] Missing parameter list**'
+		if arg_end < 0:
+			return '**[Error]** Missing )'
+
+		name = args[2][:arg_start].strip()
+		if not var_re.fullmatch(name):
+			return f'**[Error]** Invalid name {name}'
+
+		if args[2] in func_dat:
+			return f'**[Error]** Function {args[2]} already exists'
+		if args[2] in const_dat:
+			return f'**[Error]** Constant {args[2]} already exists'
+
+		params = args[2][arg_start + 1:arg_end]
+		if params.isspace() or params == '':
+			param_list = []
+		else:
+			param_list = [param.strip() for param in params.split(',')]
+
+		for param in param_list:
+			if not var_re.fullmatch(param):
+				return f'**[Error]** Invalid parameter {param}'
+
+		expr = args[2][arg_end + 1:]
+
+		for ch in expr.lower():
+			if not (ord('a') <= ord(ch) <= ord('z') or ord('0') <= ord(ch) <= ord('9') or ch.isspace() or ch in r'_+-*/%^()<>=|&!;'):
+				return f'**[Error]** Unknown symbol in expression {ch}'
+
+		func_dat[name] = {'args': param_list, 'expr': expr}
+		return f"Function {name}({', '.join(param_list)}) added"
+	elif args[1] == 'const':
+		if len(args) != 4:
+			return '**[Usage]** !mathf const <name> <value>'
+
+		if not var_re.fullmatch(args[2]):
+			return f'**[Error]** Invalid name {args[2]}'
+
+		if args[2] in func_dat:
+			return f'**[Error]** Function {args[2]} already exists'
+		if args[2] in const_dat:
+			return f'**[Error]** Constant {args[2]} already exists'
+
+		try:
+			value = int(args[3])
+		except ValueError:
+			try:
+				value = float(args[3])
+			except ValueError:
+				return f'**[Error]** Invalid value {args[3]}'
+
+		const_dat[args[2]] = value
+		return f'Constant {args[2]} set to {value}'
+	elif args[1] == 'del':
+		if len(args) != 3:
+			return '**[Usage]** !mathf del <name>'
+
+		if not var_re.fullmatch(args[2]):
+			return f'**[Error]** Invalid name {args[2]}'
+
+		if args[2] in func_dat:
+			params = func_dat.pop(args[2])['args']
+			return f"Deleted function {args[2]}({', '.join(params)})"
+		if args[2] in const_dat:
+			const_dat.pop(args[2])
+			return f"Deleted constant {args[2]}"
+
+		return f'**[Error]** No function or constant with name {args[2]}'
+	elif args[1] == 'list':
+		ret = '**Constants**\n' + '\n'.join(f'{var}={value}' for var, value in const_dat.items())
+		ret += '\n**Functions**\n' + '\n'.join(f"{var}({', '.join(value['args'])})" for var, value in func_dat.items())
+		return ret
+	else:
+		return '**[Usage]** !mathf <func|const|del> <name> [content]'
