@@ -2,7 +2,7 @@ import commands
 import discord
 
 commands_list = {'dice': 'rolls dice', 'multiroll': 'rolls multiple dice', 'percent': 'generates a percente',
-'help': 'lists commands and usages', '>here': 'pings online userse', 'math': 'perform calculations', '>role': 'manages roles',
+'help': 'lists commands and usages', '>here': 'pings online userse', 'math': 'perform calculations', 'mathf': 'manages calculation features', '>role': 'manages roles',
 '>request': 'requests a role', 'salt': 'currency commands', '>settings': 'manages server settings', 'timer': 'starts a timer'}
 
 commands_usages = {
@@ -13,6 +13,8 @@ commands_usages = {
 	'help': {'!help': 'lists all commands', '!help <command>': 'explains the usage of <command>'},
 	'here': {'!here <role>': 'pings everyone with <role> who is online', 'Aliases': '!ping'},
 	'math': {'!math <expression>': 'calculates <expression>', 'Aliases': '!calc'},
+	'mathf': {'!mathf const <name> <value>': 'Using <name> in calculations will replace it with <value>', '!mathf func <name>([args,]) <expression>': 'Creates a custom function'
+		'!mathf del <name>': 'Deletes the custom constant/function', '!mathf list': 'Lists your custom constants/functions'},
 	'role': {'!role <role>': 'opens a menu to manage <role>'},
 	'request': {'!request <role>': 'requests to add or remove <role>', 'Aliases': '!requestrole'},
 	'salt': {'!salt': 'tells you how much salt you have', '!salt claim': 'gives you more salt', '!salt gift <user> <amount>': 'gives <amount> salt to <user>'},
