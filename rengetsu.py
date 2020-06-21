@@ -97,7 +97,7 @@ class Rengetsu:
 
 				if len(to_add) > 0:
 					for member in guild.members:
-						if now - users_dict.setdefault(str(member.id), {}).setdefault('last_msg', now) > inactive_time * 86400:
+						if not user.bot and now - users_dict.setdefault(str(member.id), {}).setdefault('last_msg', now) > inactive_time * 86400:
 							for role_id in to_add:
 								role = guild.get_role(role_id)
 								if role != None and role not in member.roles:
