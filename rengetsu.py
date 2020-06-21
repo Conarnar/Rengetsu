@@ -175,7 +175,7 @@ class Rengetsu:
 			if payload.guild_id == None:
 				return
 
-			msg = f"Message https://discord.com/channels/{payload.guild_id}/{payload.channel_id}/{payload.message_id} was deleted\nChannel: <#{payload.channel_id}>\n"
+			msg = f"Message deleted from channel <#{payload.channel_id}>\n"
 			msg2 = None
 
 			if payload.cached_message == None:
