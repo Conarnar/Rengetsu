@@ -172,6 +172,25 @@ class Rengetsu:
 		async def on_raw_message_delete(payload):
 			await on_message_modify(payload.message_id)
 
+			if payload.guild_id == None:
+				return
+
+			msg = f"Message https://discord.com/channels/{payload.guild_id}/{payload.channel_id}/{payload.message_id} was deleted\n"
+			msg2 = None
+
+			if payload.cached_message == None:
+				msg += 'Message not found in cache'
+			else:
+				msg += f'Author: {payload.cached_message.author.mention}\nMessage:'
+				msg2 = payload.cached_message.content
+
+			for channel_id in self.data.setdefault('servers', {}).setdefault(str(payload.guild_id), {}).setdefault('settings', {}).setdefault('msglog', []):
+				channel = self.client.get_channel(channel_id)
+				if channel != None:
+					await channel.send(msg)
+					if msg2 != None:
+						await channel.send(msg2)
+
 		@self.client.event
 		async def on_raw_message_edit(payload):
 			await on_message_modify(payload.message_id)

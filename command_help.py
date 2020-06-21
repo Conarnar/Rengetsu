@@ -19,8 +19,9 @@ commands_usages = {
 	'request': {'!request <role>': 'requests to add or remove <role>', 'Aliases': '!requestrole'},
 	'salt': {'!salt': 'tells you how much salt you have', '!salt claim': 'gives you more salt', '!salt gift <user> <amount>': 'gives <amount> salt to <user>'},
 	'settings': {'!settings': 'lists the settings', '!settings inactive': 'disables setting users as inactive',
-		'!settings inactive <time>': 'sets <time> days to set a user as inactive', '!settings logging add <channel>': 'adds <channel> as a logging channel',
-		'!settings logging remove <channel>': 'removes <channel> as a logging channel'},
+		'!settings inactive <time>': 'sets <time> days to set a user as inactive', '!settings usrlog add <channel>': 'adds <channel> as a user logging channel',
+		'!settings usrlog remove <channel>': 'removes <channel> as a user logging channel', '!settings msglog add <channel>': 'adds <channel> as a message logging channel',
+		'!settings msglog remove <channel>': 'removes <channel> as a message logging channel'},
 	'timer': {'!timer <time>': 'sets a timer in <time>', '!timer <time> <message>': 'sets a timer in <time> that will tell you <message>'}
 }
 
