@@ -9,6 +9,7 @@ import json
 import time
 import console
 from datetime import datetime
+import io
 
 status_dict = {'online': discord.Status.online, 'idle': discord.Status.idle, 'dnd': discord.Status.dnd, 'invis': discord.Status.invisible}
 
@@ -176,20 +177,31 @@ class Rengetsu:
 				return
 
 			msg = f"Message deleted from channel <#{payload.channel_id}>\n"
-			msg2 = None
 
-			if payload.cached_message == None:
+			cached = payload.cached_message
+
+			if cached == None:
 				msg += 'Message not found in cache'
 			else:
-				msg += f'Author: {payload.cached_message.author.mention}\nMessage:'
-				msg2 = payload.cached_message.content
+				i = len(cached.attachments)
+				msg += f'Author: {payload.cached_message.author.mention}\n'
+				if i != 0:
+					msg += f'Attachments: ' + ', '.join(attachment.filename for attachment in cached.attachments)
+				msg += '\nMessage:'
+
 
 			for channel_id in self.data.setdefault('servers', {}).setdefault(str(payload.guild_id), {}).setdefault('settings', {}).setdefault('msglog', []):
 				channel = self.client.get_channel(channel_id)
 				if channel != None:
 					await channel.send(msg)
-					if msg2 != None:
-						await channel.send(msg2)
+					if cached != None:
+						files = []
+						for attachment in cached.attachments:
+							try:
+								files.append(discord.File(io.BytesIO(await attachment.read(use_cached=True)), attachment.filename, spoiler=attachment.is_spoiler()))
+							except:
+								pass
+						await channel.send(cached.content, files=files)
 
 		@self.client.event
 		async def on_raw_message_edit(payload):
