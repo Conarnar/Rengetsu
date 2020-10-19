@@ -175,6 +175,11 @@ class Rengetsu:
 
 			if payload.guild_id == None:
 				return
+				
+			msglog_channel_ids = self.data.setdefault('servers', {}).setdefault(str(payload.guild_id), {}).setdefault('settings', {}).setdefault('msglog', [])
+			
+			if int(payload.channel_id) in msglog_channel_ids:
+				return
 
 			msg = f"Message deleted from channel <#{payload.channel_id}>\n"
 
@@ -190,7 +195,7 @@ class Rengetsu:
 				msg += '\nMessage:'
 
 
-			for channel_id in self.data.setdefault('servers', {}).setdefault(str(payload.guild_id), {}).setdefault('settings', {}).setdefault('msglog', []):
+			for channel_id in msglog_channel_ids:
 				channel = self.client.get_channel(channel_id)
 				if channel != None:
 					await channel.send(msg)
