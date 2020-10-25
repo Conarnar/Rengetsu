@@ -10,7 +10,7 @@ import command_help
 def load_commands(commands):
 	commands.append(command_dice.command_dice)
 	commands.append(command_dice.command_multiroll)
-	commands.append(command_dice.command_multiroll_short)
+	commands.append(command_dice.command_xdy)
 	commands.append(command_dice.command_percent)
 	commands.append(command_math.command_math)
 	commands.append(command_math.command_mathf)
