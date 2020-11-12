@@ -27,7 +27,7 @@ class Rengetsu:
 		logger.addHandler(handler)
 
 		self.token = settings['token']
-		self.client = discord.Client(status=status_dict[settings.setdefault('status', 'online')], activity=discord.Game(settings.setdefault('activity', '')))
+		self.client = discord.Client(status=status_dict[settings.setdefault('status', 'online')], activity=discord.Game(settings.setdefault('activity', '')), intents=discord.Intents.all())
 		self.commands = []
 		self.menus = []
 		self.type_commands = []
