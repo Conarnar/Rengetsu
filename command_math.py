@@ -535,7 +535,7 @@ async def command_math(line, message, meta, reng):
 
 		expr = ''.join(expr.split())
 		expr = op_re.sub(lambda match: f' {match.group(0)} ', expr)
-		expr = sign_re.sub(lambda match: f'{match.group(1)} - ', expr)
+		expr = sign_re.sub(lambda match: f'{match.group(1)} {match.group(2)} ', expr)
 
 		if len(drs) > 0:
 			return f'`{expr}` Result: {res} [' + ' | '.join(drs) + '].'
