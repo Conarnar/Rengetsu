@@ -86,12 +86,16 @@ async def command_xdy(line, message, meta, reng):
 	try:
 		dice_count = int(match.group(1))
 
-		if dice_count <= 0 or dice_count > 100:
-			return f'**[Error]** Dice count: {dice_count} must be a positive integer 100 or less.'
+		if dice_count <= 0 or dice_count > 1000:
+			return f'**[Error]** Dice count: {dice_count} must be a positive integer 1000 or less.'
 
-		values = []
+		values = None
 
 		if (match.group(2) == None):
+			values = []
+			weights = []
+			val_len = 0
+
 			roll = match.group(3)[1:-1]
 
 			try:
@@ -99,11 +103,19 @@ async def command_xdy(line, message, meta, reng):
 					comp = lst.split(':')
 
 					if len(comp) == 1:
-						values.append(int(comp[0]))
+						val = int(comp[0])
+						values.append(range(val, val + 1))
+						weights.append(1)
+						val_len += 1
 					elif len(comp) == 2:
 						i1 = int(comp[0])
 						i2 = int(comp[1])
-						values.extend(range(min(i1, i2), max(i1, i2) + 1))
+						rn = range(min(i1, i2), max(i1, i2) + 1)
+
+						rn_len = rn.stop - rn.start
+						values.append(rn)
+						weights.append(rn_len)
+						val_len += rn_len
 
 				if len(values) == 0:
 					return f'**[Error]** Invalid roll: d[{roll}].'
@@ -111,18 +123,16 @@ async def command_xdy(line, message, meta, reng):
 				return f'**[Error]** Invalid roll: d[{roll}].'
 		else:
 			roll = int(match.group(2))
+			val_len = roll
 
 			if roll <= 0:
 				return f'**[Error]** Invalid roll: d{roll}.'
-
-			values.extend(range(1, roll + 1))
-		
-		val_len = len(values)
 
 		dl = 0
 		dh = 0
 		sort = False
 		nosum = dice_count == 1
+		sumonly = False
 		unique = False
 
 		for option in match.group(4).split():
@@ -146,20 +156,36 @@ async def command_xdy(line, message, meta, reng):
 			elif option.lower() == 'sorted':
 				sort = True
 			elif option.lower() == 'nosum':
+				if sumonly:
+					return '**[Error]** Cannot use sumonly option with nosum option or when there is only one die.'
+
 				nosum = True
+			elif option.lower() == 'sumonly':
+				if nosum:
+					return '**[Error]** Cannot use sumonly option with nosum option or when there is only one die.'
+				sumonly = True
 			elif option.lower() == 'unique':
 				unique = True
 
 				if dice_count > val_len:
 					return '**[Error]** Not enough possible values for unique option.'
+
+				if val_len > 1000000000:
+					return '**[Error]** Overflow: Cannot use more than 1000000000 die faces when using unique option.'
 			else:
 				return f'**[Error]** Unknown option: {option}.'
 
 
 		if unique:
-			res = [values.pop(random.randrange(0, val_len - i)) for i in range(dice_count)]
+			if values == None:
+				res = random.sample(range(1, roll + 1), dice_count)
+			else:
+				res = random.sample(sum((list(rn) for rn in values), []), dice_count)
 		else:
-			res = [values[random.randrange(0, val_len)] for _ in range(dice_count)]
+			if values == None:
+				res = [random.randint(1, roll) for _ in range(dice_count)]
+			else:
+				res = [random.randrange(rn.start, rn.stop) for rn in random.choices(values, weights, k=dice_count)]
 
 		if sort:
 			res.sort()
@@ -170,11 +196,12 @@ async def command_xdy(line, message, meta, reng):
 		if dh > 0:
 			dropped.update(sorted(range(dice_count), key=lambda i: res[i], reverse=True)[:dh])
 
-		statement = f"Rolled {', '.join((('~~' if i in dropped else '**') + str(res[i]) + ('~~' if i in dropped else '**')) for i in range(dice_count))}"
-
 		if nosum:
-			statement += '.'
+			statement = f"Rolled {', '.join((('~~' if i in dropped else '**') + str(res[i]) + ('~~' if i in dropped else '**')) for i in range(dice_count))}."
+		elif sumonly:
+			statement = f"Total: **{sum(res[i] for i in range(dice_count) if i not in dropped)}**."
 		else:
+			statement = f"Rolled {', '.join((('~~' if i in dropped else '**') + str(res[i]) + ('~~' if i in dropped else '**')) for i in range(dice_count))}"
 			statement += f" Total: **{sum(res[i] for i in range(dice_count) if i not in dropped)}**."
 		return statement
 	except ValueError as e:

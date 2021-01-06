@@ -11,6 +11,8 @@ functions = {'sqrt': math.sqrt, 'sin': math.sin, 'cos': math.cos, 'tan': math.ta
 
 mr_re = re.compile(r'(\d+)d(\d+)(?:d([lh])(\d*))?')
 var_re = re.compile(r'^[_a-zA-Z][_\w]*')
+sign_re = re.compile(r'([)\d\.])([-+])')
+op_re = re.compile(r'[!=<>]=|[&|]{2}|[*\/^<>]')
 
 class Calculator:
 	def __init__(self, line, funcs={}, consts={}, args={}, yields=None, array=None):
@@ -180,8 +182,8 @@ class Calculator:
 		if short:
 			self._parse_ineq(True)
 			while True:
-				if self._eat('|'):
-					if self._char == '|':
+				if self._eat('&'):
+					if self._char == '&':
 						self._next_char()
 						self._parse_ineq(True)
 					else:
@@ -531,10 +533,14 @@ async def command_math(line, message, meta, reng):
 
 		res = ', '.join('**' + str(round(val, 10)) + '**' for val in results)
 
+		expr = ''.join(expr.split())
+		expr = op_re.sub(lambda match: f' {match.group(0)} ', expr)
+		expr = sign_re.sub(lambda match: f'{match.group(1)} - ', expr)
+
 		if len(drs) > 0:
-			return f'Result: {res} [' + ' | '.join(drs) + '].'
+			return f'`{expr}` Result: {res} [' + ' | '.join(drs) + '].'
 		else:
-			return f'Result: {res}.'
+			return f'`{expr}` Result: {res}.'
 	except Exception as e:
 		return f'**[Error]** {e}.'
 
