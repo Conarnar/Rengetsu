@@ -299,13 +299,10 @@ class Rengetsu:
 				if unknown:
 					return_message.append('**[Unknown Command]**')
 
-			send = None
-			if (len(return_message) == 1):
-				send = f'{message.author.mention} {return_message[0]}'
-			elif (len(return_message) > 1):
-				send = message.author.mention + '\n' + '\n'.join(return_message)
-			if send != None:
+			send = '\n'.join(return_message)
+
+			if len(send) > 0:
 				if len(send) > 2000:
 					send = f'{message.author.mention} **[Message Error]** Message is too long to display (>2000 characters)'
 				
-				await message.channel.send(send)
+				await message.reply(send)
