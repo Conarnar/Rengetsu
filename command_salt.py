@@ -4,7 +4,6 @@ import util
 import discord
 
 cooldown = 86400
-cooldown = 10
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'salt'))
 async def command_salt(line, message, meta, reng):
