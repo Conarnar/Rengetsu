@@ -137,7 +137,7 @@ async def command_xdy(line, message, meta, reng):
 		dl = 0
 		dh = 0
 		sort = False
-		nosum = dice_count == 1
+		nosum = dice_count == 1 and mod == 0
 		sumonly = False
 		unique = False
 
@@ -209,7 +209,7 @@ async def command_xdy(line, message, meta, reng):
 		else:
 			statement = f"Rolled {', '.join((('~~' if i in dropped else '**') + str(res[i]) + ('~~' if i in dropped else '**')) for i in range(dice_count))}"
 			if mod != 0:
-				statement += f', **(+{mod})**' if mod > 0 else f', **(-{-mod})s**'
+				statement += f', **(+{mod})**' if mod > 0 else f', **(-{-mod})**'
 			statement += f" Total: **{sum(res[i] for i in range(dice_count) if i not in dropped) + mod}**."
 		return statement
 	except ValueError as e:
