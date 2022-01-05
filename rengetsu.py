@@ -78,7 +78,6 @@ class Rengetsu:
 			rows = sum(([(member.id, guild.id, now) for member in guild.members] for guild in self.client.guilds), [])
 			db = self.db()
 			cur = db.cursor()
-			print(rows)
 			
 			cur.executemany('''
 			INSERT OR IGNORE INTO member(user_id, server_id, last_msg)
@@ -110,7 +109,7 @@ class Rengetsu:
 				FROM role r
 				WHERE r.server_id = ? AND r.add_on_inactive = TRUE
 				''', (server_id,)).fetchall()
-				to_remove = ccur3.execute('''
+				to_remove = cur3.execute('''
 				SELECT rm.to_remove_id
 				FROM role r, role_remove_when_this_added rm
 				WHERE r.server_id = ? AND r.add_on_inactive = TRUE AND r.role_id = rm.added_id
