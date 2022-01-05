@@ -2,8 +2,9 @@ import commands
 import random
 import re
 
-mr_re = re.compile(r'^(\d+)d(?:(\d+)|(\[.*\]))(.*)$')
+mr_re = re.compile(r'^(\d+)d(?:(\d+)|(\[.*\]))\s*(?:(\+|-)\s*(\d+))?\s*(.*)$')
 drop_re = re.compile(r'^dl(\d*)(?:dh(\d*))?|dh(\d*)(?:dl(\d*))?$')
+mod_re = re.compile(r'^(\+|-)\s*(\d+)$')
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'dice', 'd'))
 async def command_dice(line, message, meta, reng):
@@ -128,6 +129,11 @@ async def command_xdy(line, message, meta, reng):
 			if roll <= 0:
 				return f'**[Error]** Invalid roll: d{roll}.'
 
+		mod = 0
+
+		if match.group(4) and match.group(5):
+			mod = int(match.group(4) + match.group(5))
+
 		dl = 0
 		dh = 0
 		sort = False
@@ -135,7 +141,7 @@ async def command_xdy(line, message, meta, reng):
 		sumonly = False
 		unique = False
 
-		for option in match.group(4).split():
+		for option in match.group(6).split():
 			drop_match = drop_re.match(option.lower())
 
 			if drop_match != None:
@@ -199,10 +205,12 @@ async def command_xdy(line, message, meta, reng):
 		if nosum:
 			statement = f"Rolled {', '.join((('~~' if i in dropped else '**') + str(res[i]) + ('~~' if i in dropped else '**')) for i in range(dice_count))}."
 		elif sumonly:
-			statement = f"Total: **{sum(res[i] for i in range(dice_count) if i not in dropped)}**."
+			statement = f"Total: **{sum(res[i] for i in range(dice_count) if i not in dropped) + mod}**."
 		else:
 			statement = f"Rolled {', '.join((('~~' if i in dropped else '**') + str(res[i]) + ('~~' if i in dropped else '**')) for i in range(dice_count))}"
-			statement += f" Total: **{sum(res[i] for i in range(dice_count) if i not in dropped)}**."
+			if mod != 0:
+				statement += f', **(+{mod})**' if mod > 0 else f', **(-{-mod})s**'
+			statement += f" Total: **{sum(res[i] for i in range(dice_count) if i not in dropped) + mod}**."
 		return statement
 	except ValueError as e:
 		raise commands.SkipCommand

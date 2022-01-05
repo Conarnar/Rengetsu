@@ -15,7 +15,6 @@ add_remove_edit_dict = {}
 agreement_pending_dict = {}
 
 timer_dict = {}
-role_to_message_dict = {}
 
 
 @commands.menu(id_list=agreement_pending_dict)
@@ -31,16 +30,21 @@ async def menu_agreement_pending(payload, reng):
 			await reng.client.http.add_role(pend_dict['guild_id'], pend_dict['user_id'], pend_dict['role_id'], reason='Requested')
 			await reng.client.http.edit_message(payload.channel_id, payload.message_id, content=pend_dict['agreement'] + '\n**[Accepted]**')
 
-			roles_dict = reng.data.setdefault('servers', {}).setdefault(str(pend_dict['guild_id']), {}).setdefault('roles', {})
+			db = reng.db()
+			cur = db.cursor()
+			cur.execute('''
+			SELECT r.to_remove_id
+			FROM role_remove_when_this_added r
+			WHERE r.added_id = ?
+			''', (pend_dict['role_id'],))
+			remove_when_this_role_add = [to_remove_id for to_remove_id, in cur]
 
-			if str(pend_dict['role_id']) in roles_dict:
-				role_dat = roles_dict[str(pend_dict['role_id'])]
+			for remove_id in remove_when_this_role_add:
+				try:
+					await reng.client.http.remove_role(pend_dict['guild_id'], pend_dict['user_id'], remove_id, reason=f'Removed upon adding id({pend_dict["role_id"]})')
+				except discord.errors.NotFound:
+					pass
 
-				for rem_id in role_dat.setdefault('remove_when_this_role_add', []):
-					try:
-						await reng.client.http.remove_role(pend_dict['guild_id'], pend_dict['user_id'], rem_id, reason=f'Removeed upon adding id({pend_dict["role_id"]})')
-					except discord.errors.NotFound:
-						pass
 		except discord.errors.NotFound:
 			await reng.client.http.edit_message(payload.channel_id, payload.message_id, content=pend_dict['agreement'] + '\n**[Error]** Role deleted')
 
@@ -68,6 +72,9 @@ async def menu_main(payload, reng):
 		edit = True
 	elif payload.emoji.name == emoji.ROBOT:
 		role_dat['bot_permission'] = not role_dat.setdefault('bot_permission', False)
+		edit = True
+	elif payload.emoji.name == emoji.CROWN:
+		role_dat['admin_permission'] = not role_dat.setdefault('admin_permission', False)
 		edit = True
 	elif payload.emoji.name == emoji.MEGAPHONE:
 		role_dat['requestable'] = not role_dat.setdefault('requestable', False)
@@ -114,8 +121,50 @@ async def menu_main(payload, reng):
 		add_remove_menu_dict[payload.message_id] = main_menu_dict[payload.message_id] + (extras2,)
 		del main_menu_dict[payload.message_id]
 	elif payload.emoji.name == emoji.CHECKMARK:
-		roles_dict = reng.data.setdefault('servers', {}).setdefault(str(payload.guild_id), {}).setdefault('roles', {})
-		roles_dict[str(extras['id'])] = role_dat
+		db = reng.db()
+		cur = db.cursor()
+		cur.execute('''
+		DELETE FROM role
+		WHERE role_id = ?
+		''', (extras['id'],))
+
+		cur.execute('''
+		DELETE FROM role_requestable
+		WHERE role_id = ?
+		''', (extras['id'],))
+
+		cur.execute('''
+		DELETE FROM role_add_when_this_removed
+		WHERE removed_id = ?
+		''', (extras['id'],))
+
+		cur.execute('''
+		DELETE FROM role_remove_when_this_added
+		WHERE added_id = ?
+		''', (extras['id'],))
+
+		cur.execute('''
+		INSERT INTO role(role_id, server_id, add_on_join, add_on_inactive, bot_permission, admin_permission)
+		VALUES (?, ?, ?, ?, ?, ?)
+		''', (extras['id'], payload.guild_id, role_dat['add_on_join'], role_dat['add_on_inactive'], role_dat['bot_permission'], role_dat['admin_permission']))
+
+		if role_dat['requestable']:
+			cur.execute('''
+			INSERT INTO role_requestable(role_id, temp, agreement)
+			VALUES (?, ?, ?)
+			''', (extras['id'], role_dat['requestable_temp'], role_dat['requestable_agree']))
+		
+		cur.executemany('''
+		INSERT INTO role_add_when_this_removed(removed_id, to_add_id)
+		VALUES (?, ?)
+		''', [(extras['id'], add_id) for add_id in role_dat['add_when_this_role_remove']])
+		
+		cur.executemany('''
+		INSERT INTO role_remove_when_this_added(added_id, to_remove_id)
+		VALUES (?, ?)
+		''', [(extras['id'], remove_id) for remove_id in role_dat['remove_when_this_role_add']])
+
+		db.commit()
 		await reng.client.http.clear_reactions(payload.channel_id, payload.message_id)
 		await reng.client.http.edit_message(payload.channel_id, payload.message_id, content=generate_message(role_dat, extras, reng, f'Saved {emoji.CHECKMARK}'))
 		del main_menu_dict[payload.message_id]
@@ -124,9 +173,13 @@ async def menu_main(payload, reng):
 		await reng.client.http.edit_message(payload.channel_id, payload.message_id, content=generate_message(role_dat, extras, reng, f'Cancelled {emoji.CROSSMARK}'))
 		del main_menu_dict[payload.message_id]
 	elif payload.emoji.name == emoji.NO_ENTRY:
-		roles_dict = reng.data.setdefault('servers', {}).setdefault(str(payload.guild_id), {}).setdefault('roles', {})
-		if str(extras['id']) in roles_dict:
-			del roles_dict[str(extras['id'])]
+		db = reng.db()
+		cur = db.cursor()
+		cur.execute('''
+		DELETE FROM role
+		WHERE role_id = ?
+		''', (extras['id'],))
+		db.commit()
 		await reng.client.http.clear_reactions(payload.channel_id, payload.message_id)
 		await reng.client.http.edit_message(payload.channel_id, payload.message_id, content=generate_message(role_dat, extras, reng, f'Role data reset {emoji.NO_ENTRY}'))
 		del main_menu_dict[payload.message_id]
@@ -202,6 +255,7 @@ async def menu_add_remove(payload, reng):
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.BRIEFCASE)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.GHOST)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.ROBOT)
+		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.CROWN)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.MEGAPHONE)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.CLOCK_2)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.PENCIL)
@@ -277,6 +331,7 @@ async def menu_agreement(payload, reng):
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.BRIEFCASE)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.GHOST)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.ROBOT)
+		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.CROWN)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.MEGAPHONE)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.CLOCK_2)
 		await reng.client.http.add_reaction(payload.channel_id, payload.message_id, emoji.PENCIL)
@@ -325,6 +380,11 @@ def generate_message(role_dat, extras, reng, ended=None):
 	else:
 		res += f'\nDoes not allow usage of commands (Toggle: {emoji.ROBOT})'
 
+	if role_dat.setdefault('admin_permission', False):
+		res += f'\nAllows usage of admin commands (Toggle: {emoji.CROWN})'
+	else:
+		res += f'\nDoes not allow usage of admin commands (Toggle: {emoji.CROWN})'
+
 	if role_dat.setdefault('requestable', False):
 		res += f'\nRequestable (Toggle: {emoji.MEGAPHONE})'
 
@@ -356,7 +416,16 @@ async def command_role(line, message, meta, reng):
 	if message.guild == None:
 		return '**[Error]** This command is only available in server channels.'
 
-	if not message.author.guild_permissions.administrator:
+	db = reng.db()
+	cur = db.cursor()
+	cur.execute('''
+	SELECT r.role_id
+	FROM role r
+	WHERE r.server_id = ? AND r.admin_permission = TRUE
+	''', (message.guild.id,))
+	roles = cur.fetchall()
+
+	if not message.author.guild_permissions.administrator and not any((role.id,) in roles for role in message.author.roles):
 		return '**[Error]** You do not have permission to use this command.'
 
 	if meta['len'] != 1:
@@ -372,13 +441,60 @@ async def command_role(line, message, meta, reng):
 	if len(roles) == 0:
 		return f'**[Error]** No roles found with that name ({args[1]}).'
 
-	role_dat = reng.data.setdefault('servers', {}).setdefault(str(message.guild.id), {}).setdefault('roles', {}).setdefault(str(roles[0].id), {})
+	db = reng.db()
+	cur = db.cursor()
+	cur.execute('''
+	SELECT r.add_on_join, r.add_on_inactive, r.bot_permission, r.admin_permission
+	FROM role r
+	WHERE r.role_id = ?
+	''', (roles[0].id,))
+	row = cur.fetchone()
+
+	if row == None:
+		role_dat = {}
+	else:
+		add_on_join, add_on_inactive, bot_permission, admin_permission = row
+		role_dat = {'add_on_join': add_on_join, 'add_on_inactive': add_on_inactive, 'bot_permission': bot_permission, 'admin_permission': admin_permission}
+		
+		cur.execute('''
+		SELECT r.temp, r.agreement
+		FROM role_requestable r
+		WHERE r.role_id = ?
+		''', (roles[0].id,))
+		row = cur.fetchone()
+
+		if row == None:
+			role_dat['requestable'] = False
+			role_dat['requestable_temp'] = False
+			role_dat['requestable_agree'] = ''
+		else:
+			requestable_temp, requestable_agree = row
+			role_dat['requestable'] = True
+			role_dat['requestable_temp'] = requestable_temp
+			role_dat['requestable_agree'] = requestable_agree
+		
+		cur.execute('''
+		SELECT r.to_add_id
+		FROM role_add_when_this_removed r
+		WHERE r.removed_id = ?
+		''', (roles[0].id,))
+		role_dat['add_when_this_role_remove'] = [to_add_id for to_add_id, in cur]
+		
+		cur.execute('''
+		SELECT r.to_remove_id
+		FROM role_remove_when_this_added r
+		WHERE r.added_id = ?
+		''', (roles[0].id,))
+		role_dat['remove_when_this_role_add'] = [to_remove_id for to_remove_id, in cur]
+
+
 	extras = {'mention': message.author.mention, 'name': roles[0].name, 'id': roles[0].id, 'guild_id': message.guild.id}
 	mes = await message.channel.send(generate_message(role_dat, extras, reng))
 	main_menu_dict[mes.id] = (message.author.id, dict(role_dat), extras)
 	await mes.add_reaction(emoji.BRIEFCASE)
 	await mes.add_reaction(emoji.GHOST)
 	await mes.add_reaction(emoji.ROBOT)
+	await mes.add_reaction(emoji.CROWN)
 	await mes.add_reaction(emoji.MEGAPHONE)
 	await mes.add_reaction(emoji.CLOCK_2)
 	await mes.add_reaction(emoji.PENCIL)
@@ -388,46 +504,69 @@ async def command_role(line, message, meta, reng):
 	await mes.add_reaction(emoji.CROSSMARK)
 	await mes.add_reaction(emoji.NO_ENTRY)
 
-async def timer(message_id, channel_id, guild_id, role_id, user_id, delay, reng):
+async def timer(message_id, delay, reng):
 	try:
 		await asyncio.sleep(delay)
 		del timer_dict[message_id]
-		if role_id in role_to_message_dict:
-			del role_to_message_dict[role_id]
+		
+		db = reng.db()
+		cur = db.cursor()
 
-		await reng.client.http.remove_role(guild_id, user_id, role_id, reason='Temp role expire')
+		cur.execute('''
+		SELECT t.server_id, t.role_id, t.user_id
+		FROM role_timer t
+		WHERE t.message_id = ?
+		''', (message_id,))
 
-		roles_dict = reng.data.setdefault('servers', {}).setdefault(str(guild_id), {}).setdefault('roles', {})
+		row = cur.fetchone()
 
-		if str(role_id) not in roles_dict:
-			return
+		if row != None:
+			server_id, role_id, user_id = row
+			await reng.client.http.remove_role(server_id, user_id, role_id, reason='Temp role expire')
 
-		role_dat = roles_dict[str(role_id)]
+			cur.execute('''
+			SELECT r.to_add_id
+			FROM role_add_when_this_removed r
+			WHERE r.removed_id = ?
+			''', (role_id,))
+			add_when_this_role_remove = [to_add_id for to_add_id, in cur]
 
-		for add_id in role_dat.setdefault('add_when_this_role_remove', []):
-			try:
-				await reng.client.http.add_role(guild_id, user_id, add_id, reason=f'Added upon removing id({role_id})')
-			except discord.errors.NotFound:
-				pass
+			for add_id in add_when_this_role_remove:
+				try:
+					await reng.client.http.add_role(server_id, user_id, add_id, reason=f'Added upon removing id({role_id})')
+				except discord.errors.NotFound:
+					pass
 
 	except asyncio.CancelledError:
-		if role_id in role_to_message_dict:
-			del role_to_message_dict[role_id]
-		await reng.client.http.remove_role(guild_id, user_id, role_id, reason='Temp role early removal')
-		roles_dict = reng.data.setdefault('servers', {}).setdefault(str(guild_id), {}).setdefault('roles', {})
+		db = reng.db()
+		cur = db.cursor()
 
-		if str(role_id) not in roles_dict:
-			return
+		cur.execute('''
+		SELECT t.server_id, t.channel_id, t.role_id, t.user_id
+		FROM role_timer t
+		WHERE t.message_id = ?
+		''', (message_id,))
 
-		role_dat = roles_dict[str(role_id)]
+		row = cur.fetchone()
 
-		for add_id in role_dat.setdefault('add_when_this_role_remove', []):
-			try:
-				await reng.client.http.add_role(guild_id, user_id, add_id, reason=f'Added upon removing id({role_id})')
-			except discord.errors.NotFound:
-				pass
+		if row != None:
+			server_id, channel_id, role_id, user_id = row
+			await reng.client.http.remove_role(server_id, user_id, role_id, reason='Temp role cancel')
+		
+			cur.execute('''
+			SELECT r.to_add_id
+			FROM role_add_when_this_removed r
+			WHERE r.removed_id = ?
+			''', (role_id,))
+			add_when_this_role_remove = [to_add_id for to_add_id, in cur]
 
-		await reng.client.http.send_message(channel_id, f'<@{user_id}> Your {reng.client.get_guild(guild_id).get_role(role_id).name} role has been removed')
+			for add_id in add_when_this_role_remove:
+				try:
+					await reng.client.http.add_role(server_id, user_id, add_id, reason=f'Added upon removing id({role_id})')
+				except discord.errors.NotFound:
+					pass
+			
+			await reng.client.http.send_message(channel_id, f'<@{user_id}> Your {reng.client.get_guild(server_id).get_role(role_id).name} role has been removed')
 
 def cancel(message):
 	if message in timer_dict:
@@ -462,56 +601,95 @@ async def command_request(line, message, meta, reng):
 		args2 = args[1].rpartition(' ')
 		duration = util.parse_time(args2[2])
 
-		if duration == 0:
-			return f'**[Error]** No roles found with that name ({args[1]}).'
-
 		roles = [role for role in message.guild.roles if role.name == args2[0]]
 
 		if len(roles) == 0:
 			return f'**[Error]** No roles found with that name ({args2[0]}).'
 
-	roles_dict = reng.data.setdefault('servers', {}).setdefault(str(message.guild.id), {}).setdefault('roles', {})
+	db = reng.db()
+	cur = db.cursor()
+
+	cur.execute('''
+	SELECT r.temp, r.agreement
+	FROM role_requestable r
+	WHERE r.role_id = ?
+	''', (roles[0].id,))
+
+	row = cur.fetchone()
+
+	if row == None:
+		return f'**[Error]** Role ({roles[0].name}) is not requstable.'
+
+	requestable_temp, requestable_agree = row
+
+	cur.execute('''
+	SELECT r.to_add_id
+	FROM role_add_when_this_removed r
+	WHERE r.removed_id = ?
+	''', (roles[0].id,))
+	add_when_this_role_remove = [to_add_id for to_add_id, in cur]
 	
-	if str(roles[0].id) not in roles_dict:
-		return f'**[Error]** Role ({roles[0].name}) is not requstable.'
+	cur.execute('''
+	SELECT r.to_remove_id
+	FROM role_remove_when_this_added r
+	WHERE r.added_id = ?
+	''', (roles[0].id,))
+	remove_when_this_role_add = [to_remove_id for to_remove_id, in cur]
 
-	role_dat = roles_dict[str(roles[0].id)]
-
-	if not role_dat.setdefault('requestable', False):
-		return f'**[Error]** Role ({roles[0].name}) is not requstable.'
-
-	if role_dat.setdefault('requestable_temp', False):
+	if requestable_temp:
 		if roles[0] in message.author.roles:
-			if roles[0].id in role_to_message_dict:
-				message_id = role_to_message_dict[roles[0].id]
-				del role_to_message_dict[roles[0].id]
-				timer_dict[message_id]['timer'].cancel()
+			cur.execute('''
+			SELECT r.message_id
+			FROM role_timer r
+			WHERE r.role_id = ? AND r.user_id = ?
+			''', (roles[0].id, message.author.id))
+			row = cur.fetchone()
+
+			if row != None:
+				message_id, = row
+				timer_dict[message_id]['task'].cancel()
 				del timer_dict[message_id]
-				return
-			else:
-				add = [message.guild.get_role(role_id) for role_id in role_dat.setdefault('add_when_this_role_remove', []) if message.guild.get_role(role_id) != None]
-				await message.author.remove_roles(roles[0], reason='Requested')
-				await message.author.add_roles(*add, reason=f'Added upon removing {roles[0].name}')
-				return f'Your {roles[0].name} role has been removed'
+
+				cur.execute('''
+				DELETE FROM role_timer
+				WHERE message_id = ?
+				''', (message_id,))
+				db.commit()
+			
+			add = [message.guild.get_role(role_id) for role_id in add_when_this_role_remove if message.guild.get_role(role_id) != None]
+			await message.author.remove_roles(roles[0], reason='Requested')
+			await message.author.add_roles(*add, reason=f'Added upon removing {roles[0].name}')
+			return f'Your {roles[0].name} role has been removed'
 		
 		if duration == None:
 			return f'**[Error]** Role ({roles[0].name}) can only be temporarily requstable. Please add a time argument.'
+		
+		if duration <= 0 or duration > 604800:
+			return f'**[Error]** Arg 2 ({args[1]}) must represent time between 1 second and 1 week.'
 
-		if role_dat.setdefault('requestable_agree', '') != '':
+		if requestable_agree:
 			return '**[Not Implemented]**'
 
-		rem = [message.guild.get_role(role_id) for role_id in role_dat.setdefault('remove_when_this_role_add', []) if message.guild.get_role(role_id) != None]
+		rem = [message.guild.get_role(role_id) for role_id in remove_when_this_role_add if message.guild.get_role(role_id) != None]
 		await message.author.add_roles(roles[0], reason='Requested')
 		await message.author.remove_roles(*rem, reason=f'Removed upon adding {roles[0].name}')
 		now = time.time()
-		task = reng.client.loop.create_task(timer(message.id, message.channel.id, message.guild.id, roles[0].id, message.author.id, duration, reng))
+		task = reng.client.loop.create_task(timer(message.id, duration, reng))
 		timer_dict[message.id] = {'task': task, 'message_id': message.id, 'channel_id': message.channel.id, 'guild_id': message.guild.id,
 			'role_id': roles[0].id, 'user_id': message.author.id, 'end_on': now + duration}
 		await message.add_reaction(emoji.X)
+
+		db = reng.db()
+		db.execute('''
+		INSERT INTO role_timer(message_id, channel_id, server_id, role_id, user_id, end_on)
+		VALUES (?, ?, ?, ?, ?, ?)
+		''', (message.id, message.channel.id, message.guild.id, roles[0].id, message.author.id, now + duration))
+		db.commit()
+
 		return f'You have been given the {roles[0].name} role. Edit, delete, or {emoji.X} the original message to remove early.'
 	else:
 		if roles[0] in message.author.roles:
-			add = [message.guild.get_role(role_id) for role_id in role_dat.setdefault('add_when_this_role_remove', []) if message.guild.get_role(role_id) != None]
+			add = [message.guild.get_role(role_id) for role_id in add_when_this_role_remove if message.guild.get_role(role_id) != None]
 			await message.author.remove_roles(roles[0], reason='Requested')
 			await message.author.add_roles(*add, reason=f'Added upon removing {roles[0].name}')
 			return f'Your {roles[0].name} role has been removed'
@@ -520,11 +698,11 @@ async def command_request(line, message, meta, reng):
 		if duration != None:
 			return f'**[Error]** Role ({roles[0].name}) cannot be temporarily requstable. Please remove the time argument.'
 
-		if role_dat.setdefault('requestable_agree', '') != '':
+		if requestable_agree:
 			if any(v['user_id'] == message.author.id for v in agreement_menu_dict.values()):
 				return '**[Error]** You already have an agreement pending. You cannot request this role until you have accepted or declined your previous agreement.'
 			
-			agree_text = f'{message.author.mention} Agreement for role {roles[0].name} in server {message.guild.name}:\n' + role_dat['requestable_agree']
+			agree_text = f'{message.author.mention} Agreement for role {roles[0].name} in server {message.guild.name}:\n' + requestable_agree
 
 			try:
 				await message.author.create_dm()
@@ -537,26 +715,32 @@ async def command_request(line, message, meta, reng):
 			agreement_pending_dict[mes.id] = {'role_id': roles[0].id, 'guild_id': message.guild.id, 'user_id': message.author.id, 'agreement': agree_text}
 			return f'An agreement has been sent to you. React with {emoji.CHECKMARK} to accept or {emoji.CROSSMARK} to decline.'
 
-		rem = [message.guild.get_role(role_id) for role_id in role_dat.setdefault('remove_when_this_role_add', []) if message.guild.get_role(role_id) != None]
+		rem = [message.guild.get_role(role_id) for role_id in remove_when_this_role_add if message.guild.get_role(role_id) != None]
 		await message.author.add_roles(roles[0], reason='Requested')
 		await message.author.remove_roles(*rem, reason=f'Removed upon adding {roles[0].name}')
 		return f'You have been given the {roles[0].name} role'
 
-def on_login(reng):
-	for guild_id in reng.data.setdefault('servers', {}):
-		guild = reng.client.get_guild(int(guild_id))
-		if guild != None:
-			roles = reng.data['servers'][guild_id].setdefault('roles', {})
-			reng.data['servers'][guild_id]['roles'] = {k: v for k, v in roles.items() if guild.get_role(int(k)) != None}
-
 def on_load(reng):
-	for timer_dat in reng.data.setdefault('role_timers', []):
-		if timer_dat['end_on'] > time.time():
-			task = reng.client.loop.create_task(timer(timer_dat['message_id'], timer_dat['channel_id'], timer_dat['guild_id'], timer_dat['role_id'],
-				timer_dat['user_id'], timer_dat['end_on'] - time.time(), reng))
-			timer_dict[timer_dat['message_id']] = dict(timer_dat)
-			timer_dict[timer_dat['message_id']].update({'task': task})
-			role_to_message_dict[timer_dat['role_id']] = timer_dat['message_id']
+	now = time.time()
+
+	db = reng.db()
+	cur = db.cursor()
+	
+	cur.execute('''
+	DELETE FROM role_timer
+	WHERE end_on < ?
+	''', (now,))
+	
+	cur.execute('''
+	SELECT t.message_id, t.channel_id, t.server_id, t.role_id, t.user_id, t.end_on
+	FROM role_timer t
+	''')
+
+	db.commit()
+
+	for message_id, channel_id, server_id, role_id, user_id, end_on in cur:
+		task = reng.client.loop.create_task(timer(message_id, end_on - now, reng))
+		timer_dict[message_id] = {'task': task, 'user_id': user_id}
 
 def on_save(reng):
 	reng.data['role_timers'] = [{k: v for k, v in value.items() if k != 'task'} for value in timer_dict.values()]

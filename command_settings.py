@@ -7,34 +7,75 @@ async def command_settings(line, message, meta, reng):
 	if message.guild == None:
 		return '**[Error]** This command is only available in server channels.'
 
-	if not message.author.guild_permissions.administrator:
+	db = reng.db()
+	cur = db.cursor()
+	db.execute('''
+	SELECT r.role_id
+	FROM role r
+	WHERE r.server_id = ? AND r.admin_permission = TRUE
+	''', (message.guild.id,))
+	roles = cur.fetchall()
+
+	if not message.author.guild_permissions.administrator and not any((role.id,) in roles for role in message.author.roles):
 		return '**[Error]** You do not have permission to use this command.'
 
 	args = line.split()
 
-	settings = reng.data.setdefault('servers', {}).setdefault(str(message.guild.id), {}).setdefault('settings', {})
+	cur.execute('''
+	INSERT OR IGNORE INTO server(server_id)
+	VALUES (?)
+	''', (message.guild.id,))
+	db.commit()
 
 	if len(args) == 1:
-		days = settings.setdefault('inactive', 0)
-		log_channels = settings.setdefault('logging', [])
-		usrlogs = [channel_id for channel_id in log_channels if reng.client.get_channel(channel_id) != None]
-		msglog_channels = settings.setdefault('msglog', [])
-		msglogs = [channel_id for channel_id in msglog_channels if reng.client.get_channel(channel_id) != None]
+		cur.execute('''
+		SELECT s.inactive_days
+		FROM server s
+		WHERE s.server_id = ?
+		''', (message.guild.id,))
+
+		inactive_days, = cur.fetchone()
+
+		cur.execute('''
+		SELECT c.channel_id
+		FROM channel c
+		WHERE c.server_id = ? AND c.user_log = TRUE
+		''', (message.guild.id,))
+		user_logs = cur.fetchall()
+
+		cur.execute('''
+		SELECT c.channel_id
+		FROM channel c
+		WHERE c.server_id = ? AND c.msg_log = TRUE
+		''', (message.guild.id,))
+		msg_logs = cur.fetchall()
 
 		return '[Server settings]\n' + \
-		('Inactive roles disabled.' if settings.setdefault('inactive', 0) == 0 else f'Inactivity period: {days} day{"s" if days > 1 else ""}.') + \
-		'\n' + ('No user logging channels.' if len(usrlogs) == 0 else ('User logging channels: ' + ', '.join(f'<#{channel_id}>' for channel_id in usrlogs) + '.')) + \
-		'\n' + ('No message logging channels.' if len(msglogs) == 0 else ('Message logging channels: ' + ', '.join(f'<#{channel_id}>' for channel_id in msglogs) + '.'))
+		('Inactive roles disabled.' if inactive_days == None else f'Inactivity period: {inactive_days} day{"s" if inactive_days > 1 else ""}.') + \
+		'\n' + ('No user logging channels.' if len(user_logs) == 0 else ('User logging channels: ' + ', '.join(f'<#{channel_id}>' for channel_id, in user_logs) + '.')) + \
+		'\n' + ('No message logging channels.' if len(msg_logs) == 0 else ('Message logging channels: ' + ', '.join(f'<#{channel_id}>' for channel_id, in msg_logs) + '.'))
 
 	if args[1] == 'inactive':
 		if len(args) == 2:
-			settings['inactive'] = 0
+			cur.execute('''
+			UPDATE server
+			SET inactive_days = ?
+			WHERE server_id = ?
+			''', (None, message.guild.id))
+			db.commit()
+
 			return 'Inactive roles disabled'
 		elif len(args) == 3:
 			try:
 				i = int(args[2])
 				if i > 0:
-					settings['inactive'] = i
+					cur.execute('''
+					UPDATE server
+					SET inactive_days = ?
+					WHERE server_id = ?
+					''', (i, message.guild.id))
+					db.commit()
+
 					return f'Inactivity period set to {i} day{"s" if i > 1 else ""}.'
 			except ValueError:
 				pass
@@ -58,12 +99,29 @@ async def command_settings(line, message, meta, reng):
 				if channel == None or channel.type != discord.ChannelType.text:
 					return f'**[Error]** Arg 3 ({args[3]}) must be a valid channel mention.'
 
-				log_channels = settings.setdefault('logging', [])
+				cur.execute('''
+				SELECT c.user_log
+				FROM channel c
+				WHERE c.server_id = ? AND c.channel_id = ? 
+				''', (message.guild.id, channel_id))
+				is_log = cur.fetchall()
 
-				if channel_id in log_channels:
+				if is_log and is_log[0][0]:
 					return f'**[Error]** That channel is already a user logging channel.'
 
-				log_channels.append(channel.id)
+				if not is_log:
+					cur.execute('''
+					INSERT INTO channel(server_id, channel_id, user_log)
+					VALUES (?, ?, TRUE)
+					''', (message.guild.id, channel_id))
+					db.commit()
+				else:
+					cur.execute('''
+					UPDATE channel
+					SET user_log = TRUE
+					WHERE server_id = ? AND channel_id = ? 
+					''', (message.guild.id, channel_id))
+					db.commit()
 
 				return f'Added {channel.mention} as a user logging channel.'
 			elif args[2] == 'remove':
@@ -82,12 +140,22 @@ async def command_settings(line, message, meta, reng):
 				if channel == None or channel.type != discord.ChannelType.text:
 					return f'**[Error]** Arg 3 ({args[3]}) must be a valid channel mention.'
 
-				log_channels = settings.setdefault('logging', [])
+				cur.execute('''
+				SELECT c.user_log
+				FROM channel c
+				WHERE c.server_id = ? AND c.channel_id = ? 
+				''', (message.guild.id, channel_id))
+				is_log = cur.fetchall()
 
-				if channel_id not in log_channels:
+				cur.execute('''
+				UPDATE channel
+				SET user_log = FALSE
+				WHERE server_id = ? AND channel_id = ? 
+				''', (message.guild.id, channel_id))
+				db.commit()
+
+				if not is_log or not is_log[0][0]:
 					return f'**[Error]** That channel is not a user logging channel.'
-
-				log_channels.remove(channel.id)
 
 				return f'Removed {channel.mention} as a user logging channel.'
 
@@ -110,12 +178,29 @@ async def command_settings(line, message, meta, reng):
 				if channel == None or channel.type != discord.ChannelType.text:
 					return f'**[Error]** Arg 3 ({args[3]}) must be a valid channel mention.'
 
-				msglog_channels = settings.setdefault('msglog', [])
+				cur.execute('''
+				SELECT c.msg_log
+				FROM channel c
+				WHERE c.server_id = ? AND c.channel_id = ? 
+				''', (message.guild.id, channel_id))
+				is_log = cur.fetchall()
 
-				if channel_id in msglog_channels:
+				if is_log and is_log[0][0]:
 					return f'**[Error]** That channel is already a message logging channel.'
 
-				msglog_channels.append(channel.id)
+				if not is_log:
+					cur.execute('''
+					INSERT INTO channel(server_id, channel_id, msg_log)
+					VALUES (?, ?, TRUE)
+					''', (message.guild.id, channel_id))
+					db.commit()
+				else:
+					cur.execute('''
+					UPDATE channel
+					SET msg_log = TRUE
+					WHERE server_id = ? AND channel_id = ? 
+					''', (message.guild.id, channel_id))
+					db.commit()
 
 				return f'Added {channel.mention} as a message logging channel.'
 			elif args[2] == 'remove':
@@ -134,12 +219,22 @@ async def command_settings(line, message, meta, reng):
 				if channel == None or channel.type != discord.ChannelType.text:
 					return f'**[Error]** Arg 3 ({args[3]}) must be a valid channel mention.'
 
-				msglog_channels = settings.setdefault('msglog', [])
+				cur.execute('''
+				SELECT c.msg_log
+				FROM channel c
+				WHERE c.server_id = ? AND c.channel_id = ? 
+				''', (message.guild.id, channel_id))
+				is_log = cur.fetchall()
 
-				if channel_id not in msglog_channels:
+				cur.execute('''
+				UPDATE channel
+				SET msg_log = FALSE
+				WHERE server_id = ? AND channel_id = ? 
+				''', (message.guild.id, channel_id))
+				db.commit()
+
+				if not is_log or not is_log[0][0]:
 					return f'**[Error]** That channel is not a message logging channel.'
-
-				msglog_channels.remove(channel.id)
 
 				return f'Removed {channel.mention} as a message logging channel.'
 

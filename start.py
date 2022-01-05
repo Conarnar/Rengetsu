@@ -15,7 +15,7 @@ if __name__ == '__main__':
 				settings = json.load(f)
 				start(settings)
 		except OSError as e:
-			print('Could not read settings file:', e)
+			print('Error:', e)
 	else:
 		try:
 			token = input('Please enter token: ')

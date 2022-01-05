@@ -4,18 +4,27 @@ import util
 import discord
 
 cooldown = 86400
+cooldown = 10
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'salt'))
 async def command_salt(line, message, meta, reng):
 	args = line.split()
+	
+	db = reng.db()
+	cur = db.cursor()
 
-	salt_dat = reng.data.setdefault('users', {}).setdefault(str(message.author.id), {}).setdefault('salt', {})
+	cur.execute('''
+	SELECT u.salt_amount, u.salt_last_claim, u.salt_remind
+	FROM user u
+	WHERE u.user_id = ?
+	''', (message.author.id,))
+	salt_amount, last_claim, salt_remind = cur.fetchone()
 
 	if len(args) == 1:
-		return f'You have {salt_dat.setdefault("salt", 0)} salt.'
+		return f'You have {salt_amount} salt.'
 	elif args[1] == 'claim':
 		now = time.time()
-		since = now - salt_dat.setdefault('last_claim', 0)
+		since = now - last_claim
 
 		if since < cooldown:
 			int_since = int(cooldown - since)
@@ -36,10 +45,13 @@ async def command_salt(line, message, meta, reng):
 
 			return ret + '.'
 		else:
-			salt_dat['salt'] = salt_dat.setdefault("salt", 0) + 2000
-			salt_dat['last_claim'] = now
-			salt_dat['reminded'] = False
-			return f'You gained 2000 salt. You now have {salt_dat["salt"]} salt.'
+			cur.execute('''
+			UPDATE user
+			SET salt_amount = ?, salt_last_claim = ?, salt_reminded = ?
+			WHERE user_id = ?
+			''', (salt_amount + 2000, now, False, message.author.id))
+			db.commit()
+			return f'You gained 2000 salt. You now have {salt_amount + 2000} salt.'
 	elif args[1] == 'gift':
 		if len(args) != 4:
 			return '**[Usage]** !salt gift <mention> <amount>'
@@ -49,41 +61,76 @@ async def command_salt(line, message, meta, reng):
 		if match == None:
 			return f'**[Error]** Arg 2 ({args[2]}) must be a valid user mention.'
 
-		try:
-			amount = int(args[3])
-		except ValueError:
-			return f'**[Error]** Arg 3 ({args[3]}) must be a positive integer.'
-
-		if amount <= 0:
-			f'**[Error]** Arg 3 ({args[3]}) must be a positive integer.'
-
 		user_id = int(match.group(1))
-
-		if message.author.id == user_id:
-			return f'**[Error]** You cannot gift salt to yourself.'
 
 		user = reng.client.get_user(user_id)
 
 		if user == None:
 			return f'**[Error]** Arg 2 ({args[2]}) must be a valid user mention.'
 
-		if salt_dat.setdefault("salt", 0) < amount:
+		if message.author.id == user_id:
+			return f'**[Error]** You cannot gift salt to yourself.'
+
+		if message.author.bot:
+			return f'**[Error]** You cannot gift salt to a bot.'
+
+		try:
+			transaction = int(args[3])
+		except ValueError:
+			return f'**[Error]** Arg 3 ({args[3]}) must be a positive integer.'
+
+		if transaction <= 0:
+			f'**[Error]** Arg 3 ({args[3]}) must be a positive integer.'
+
+		if salt_amount < transaction:
 			return f'**[Error]** You do not have enough salt.'
 
-		other_salt_dat = reng.data['users'].setdefault(str(user.id), {}).setdefault('salt', {})
-		other_salt_dat['salt'] = other_salt_dat.setdefault("salt", 0) + amount
-		salt_dat['salt'] -= amount
+		cur.execute('''
+		INSERT OR IGNORE INTO user(user_id, salt_amount)
+		VALUES (?, ?)
+		''', (user_id, transaction))
+
+		other_salt_amount = transaction
+		if cur.rowcount == 0:
+			cur.execute('''
+			SELECT u.salt_amount
+			FROM user u
+			WHERE u.user_id = ?
+			''', (user_id,))
+
+			other_salt_amount, = cur.fetchone()
+			other_salt_amount += transaction
+			cur.execute('''
+			UPDATE user
+			SET salt_amount = ?
+			WHERE user_id = ?
+			''', (other_salt_amount, user_id))
+		
+		salt_amount -= transaction
+		cur.execute('''
+		UPDATE user
+		SET salt_amount = ?
+		WHERE user_id = ?
+		''', (salt_amount, message.author.id))
+		db.commit()
 
 		try:
 			await user.create_dm()
-			await user.send(f'{user.mention} You have been gifted {amount} salt from {message.author.mention}. You now have {other_salt_dat["salt"]} salt.')
+			await user.send(f'{user.mention} You have been gifted {transaction} salt from {message.author.mention}. You now have {other_salt_amount} salt.')
 		except discord.errors.Forbidden:
 			pass
 
-		return f'You gifted {amount} salt to {user.mention}. You now have {salt_dat["salt"]} salt.'
+		return f'You gifted {transaction} salt. You now have {salt_amount} salt.'
 	elif args[1] == 'remind':
-		salt_dat['remind'] = not salt_dat.setdefault('remind', False)
-		return f'You have turned o{"n" if salt_dat["remind"] else "ff"} daily claim reminders.'
+		salt_remind = not salt_remind
+		cur.execute('''
+		UPDATE user
+		SET salt_remind = ?
+		WHERE user_id = ?
+		''', (salt_remind, message.author.id))
+		db.commit()
+
+		return f'You have turned o{"n" if salt_remind else "ff"} daily claim reminders.'
 
 
 	return '**[Usage]** !salt [claim|gift|remind]'

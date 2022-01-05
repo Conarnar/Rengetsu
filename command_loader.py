@@ -6,6 +6,7 @@ import command_timer
 import command_settings
 import command_salt
 import command_help
+import command_db
 
 def load_commands(commands):
 	commands.append(command_dice.command_dice)
@@ -13,7 +14,6 @@ def load_commands(commands):
 	commands.append(command_dice.command_xdy)
 	commands.append(command_dice.command_percent)
 	commands.append(command_math.command_math)
-	commands.append(command_math.command_mathf)
 	commands.append(command_here.command_here)
 	commands.append(command_role.command_role)
 	commands.append(command_role.command_request)
@@ -21,6 +21,7 @@ def load_commands(commands):
 	commands.append(command_settings.command_settings)
 	commands.append(command_salt.command_salt)
 	commands.append(command_help.command_help)
+	commands.append(command_db.command_db)
 
 def load_menus(menus):
 	menus.append(command_role.menu_main)
@@ -41,10 +42,3 @@ def load_message_modifies(message_modifies):
 def on_load(reng):
 	command_timer.on_load(reng)
 	command_role.on_load(reng)
-
-def on_login(reng):
-	command_role.on_login(reng)
-
-def on_save(reng):
-	command_timer.on_save(reng)
-	command_role.on_save(reng)

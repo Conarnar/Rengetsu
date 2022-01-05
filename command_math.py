@@ -517,9 +517,8 @@ async def command_math(line, message, meta, reng):
 			expr = expr[:match.start()] + f' {total} ' + expr[match.end():]
 			match = mr_re.search(expr)
 
-		mathf_dat = reng.data.setdefault('users', {}).setdefault(str(message.author.id), {}).setdefault('mathf', {})
-		func_dat = mathf_dat.setdefault('func', {})
-		const_dat = mathf_dat.setdefault('const', {})
+		func_dat = {}
+		const_dat = {}
 
 		calc = Calculator(expr, funcs=func_dat, consts=const_dat)
 		results = calc.yields()
@@ -543,100 +542,3 @@ async def command_math(line, message, meta, reng):
 			return f'`{expr}` Result: {res}.'
 	except Exception as e:
 		return f'**[Error]** {e}.'
-
-
-@commands.command(condition=lambda line : commands.first_arg_match(line, 'mathf'))
-async def command_mathf(line, message, meta, reng):
-	args = line.split()
-
-	mathf_dat = reng.data.setdefault('users', {}).setdefault(str(message.author.id), {}).setdefault('mathf', {})
-	func_dat = mathf_dat.setdefault('func', {})
-	const_dat = mathf_dat.setdefault('const', {})
-
-	if len(args) <= 1:
-		return '**[Usage]** !mathf <func|const|del|list>'
-
-	if args[1] == 'func':
-		if len(args) == 2:
-			return '**[Usage]** !mathf func <name>([args,]) <expression>'
-
-		args = line.split(maxsplit=2)
-
-		arg_start = args[2].find('(')
-		arg_end = args[2].find(')')
-
-		if arg_start < 0 or (arg_start > arg_end and arg_end != -1):
-			return '**[Error] Missing parameter list**'
-		if arg_end < 0:
-			return '**[Error]** Missing )'
-
-		name = args[2][:arg_start].strip()
-		if not var_re.fullmatch(name):
-			return f'**[Error]** Invalid name {name}'
-
-		if args[2] in func_dat:
-			return f'**[Error]** Function {args[2]} already exists'
-		if args[2] in const_dat:
-			return f'**[Error]** Constant {args[2]} already exists'
-
-		params = args[2][arg_start + 1:arg_end]
-		if params.isspace() or params == '':
-			param_list = []
-		else:
-			param_list = [param.strip() for param in params.split(',')]
-
-		for param in param_list:
-			if not var_re.fullmatch(param):
-				return f'**[Error]** Invalid parameter {param}'
-
-		expr = args[2][arg_end + 1:]
-
-		for ch in expr.lower():
-			if not (ord('a') <= ord(ch) <= ord('z') or ord('0') <= ord(ch) <= ord('9') or ch.isspace() or ch in r'_+-*/%^()<>=|&!;'):
-				return f'**[Error]** Unknown symbol in expression {ch}'
-
-		func_dat[name] = {'args': param_list, 'expr': expr}
-		return f"Function {name}({', '.join(param_list)}) added"
-	elif args[1] == 'const':
-		if len(args) != 4:
-			return '**[Usage]** !mathf const <name> <value>'
-
-		if not var_re.fullmatch(args[2]):
-			return f'**[Error]** Invalid name {args[2]}'
-
-		if args[2] in func_dat:
-			return f'**[Error]** Function {args[2]} already exists'
-		if args[2] in const_dat:
-			return f'**[Error]** Constant {args[2]} already exists'
-
-		try:
-			value = int(args[3])
-		except ValueError:
-			try:
-				value = float(args[3])
-			except ValueError:
-				return f'**[Error]** Invalid value {args[3]}'
-
-		const_dat[args[2]] = value
-		return f'Constant {args[2]} set to {value}'
-	elif args[1] == 'del':
-		if len(args) != 3:
-			return '**[Usage]** !mathf del <name>'
-
-		if not var_re.fullmatch(args[2]):
-			return f'**[Error]** Invalid name {args[2]}'
-
-		if args[2] in func_dat:
-			params = func_dat.pop(args[2])['args']
-			return f"Deleted function {args[2]}({', '.join(params)})"
-		if args[2] in const_dat:
-			const_dat.pop(args[2])
-			return f"Deleted constant {args[2]}"
-
-		return f'**[Error]** No function or constant with name {args[2]}'
-	elif args[1] == 'list':
-		ret = '**Constants**\n' + '\n'.join(f'{var}={value}' for var, value in const_dat.items())
-		ret += '\n**Functions**\n' + '\n'.join(f"{var}({', '.join(value['args'])})" for var, value in func_dat.items())
-		return ret
-	else:
-		return '**[Usage]** !mathf <func|const|del> <name> [content]'

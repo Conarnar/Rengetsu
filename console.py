@@ -106,4 +106,4 @@ def console(reng):
 				continue
 
 			reng.client.loop.create_task(channel.send(f'**[Console]** {line}'))
-	reng.client.loop.create_task(reng.client.logout())
+	reng.client.loop.create_task(reng.client.close())

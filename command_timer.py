@@ -24,15 +24,54 @@ async def menu_cancel(payload, reng):
 async def modify_cancel(message_id, reng):
 	cancel(message_id)
 
-async def timer(channel_id, message_id, mention, desc, delay, set_on, reng):
+async def timer(message_id, delay, reng):
 	try:
 		await asyncio.sleep(delay)
 		del timer_dict[message_id]
-		embed = discord.Embed(title='Timer', description=desc, timestamp=datetime.datetime.utcfromtimestamp(set_on))
-		embed.set_footer(text='Set on:')
-		await reng.client.http.send_message(channel_id, mention, embed=embed.to_dict())
+
+		db = reng.db()
+		cur = db.cursor()
+
+		cur.execute('''
+		SELECT t.channel_id, t.user_id, t.text, t.set_on
+		FROM timer t
+		WHERE t.message_id = ?
+		''', (message_id,))
+
+		row = cur.fetchone()
+		
+		if row != None:
+			cur.execute('''
+			DELETE FROM timer
+			WHERE message_id = ?
+			''', (message_id,))
+			db.commit()
+
+			channel_id, user_id, text, set_on = row
+			embed = discord.Embed(title='Timer', description=text, timestamp=datetime.datetime.utcfromtimestamp(set_on))
+			embed.set_footer(text='Set on:')
+			await reng.client.http.send_message(channel_id, f'<@{user_id}>', embed=embed.to_dict())
 	except asyncio.CancelledError:
-		await reng.client.http.send_message(channel_id, f'{mention} Your timer has been cancelled.')
+		db = reng.db()
+		cur = db.cursor()
+
+		cur.execute('''
+		SELECT t.channel_id, t.user_id
+		FROM timer t
+		WHERE t.message_id = ?
+		''', (message_id,))
+
+		row = cur.fetchone()
+		
+		if row != None:
+			cur.execute('''
+			DELETE FROM timer
+			WHERE message_id = ?
+			''', (message_id,))
+			db.commit()
+			
+			channel_id, user_id = row
+			await reng.client.http.send_message(channel_id, f'<@{user_id}> Your timer has been cancelled.')
 
 @commands.command(condition=lambda line : commands.first_arg_match(line, 'timer'))
 async def command_timer(line, message, meta, reng):
@@ -41,7 +80,7 @@ async def command_timer(line, message, meta, reng):
 	
 	args = line.split(maxsplit=2)
 
-	if len(args) == 0:
+	if len(args) == 1:
 		return '**[Usage]** !timer <time> [message]'
 	delay = util.parse_time(args[1])
 	if delay <= 0 or delay > 604800:
@@ -49,19 +88,37 @@ async def command_timer(line, message, meta, reng):
 
 	desc = args[2] if len(args) == 3 else 'Timer is done'
 	now = time.time()
-	task = reng.client.loop.create_task(timer(message.channel.id, message.id, message.author.mention, desc, delay, now, reng))
-	timer_dict[message.id] = {'task': task, 'user_id': message.author.id, 'message_id': message.id, 'channel_id': message.channel.id, 'message': desc,
-		'set_on': now, 'end_on': now + delay}
+
+	db = reng.db()
+	db.execute('''
+	INSERT INTO timer(message_id, channel_id, user_id, text, set_on, end_on)
+	VALUES (?, ?, ?, ?, ?, ?)
+	''', (message.id, message.channel.id, message.author.id, desc, now, now + delay))
+	db.commit()
+
+	task = reng.client.loop.create_task(timer(message.id, delay, reng))
+	timer_dict[message.id] = {'task': task, 'user_id': message.author.id}
 	await message.add_reaction(emoji.X)
 	return f'Timer has been set. Edit, delete, or {emoji.X} the original message to cancel.'
 
 def on_load(reng):
-	for timer_dat in reng.data.setdefault('timers', []):
-		if timer_dat['end_on'] > time.time():
-			task = reng.client.loop.create_task(timer(timer_dat['channel_id'], timer_dat['message_id'], f'<@{timer_dat["user_id"]}>', timer_dat['message'],
-				timer_dat['end_on'] - time.time(), timer_dat['set_on'], reng))
-			timer_dict[timer_dat['message_id']] = dict(timer_dat)
-			timer_dict[timer_dat['message_id']].update({'task': task})
+	now = time.time()
+
+	db = reng.db()
+	cur = db.cursor()
 	
-def on_save(reng):
-	reng.data['timers'] = [{k: v for k, v in value.items() if k != 'task'} for value in timer_dict.values()]
+	cur.execute('''
+	DELETE FROM timer
+	WHERE end_on < ?
+	''', (now,))
+
+	cur.execute('''
+	SELECT t.channel_id, t.message_id, t.user_id, t.text, t.end_on, t.set_on
+	FROM timer t
+	''')
+
+	db.commit()
+
+	for channel_id, message_id, user_id, text, end_on, set_on in cur:
+		task = reng.client.loop.create_task(timer(message_id, end_on - now, reng))
+		timer_dict[message_id] = {'task': task, 'user_id': user_id}

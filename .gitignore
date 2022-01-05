@@ -131,3 +131,6 @@ dmypy.json
 # Rengetsu generated files
 /reng_dat/
 /reng_log/
+
+# VSCode
+*.code-workspace
