@@ -348,33 +348,34 @@ class Rengetsu:
 			VALUES (?)
 			''', (message.author.id,))
 
-			cur.execute('''
-			SELECT m.user_id
-			FROM member m
-			WHERE m.user_id = ? AND m.server_id = ?
-			''', (message.author.id, message.guild.id))
-
-			if cur.fetchall():
+			if message.guild != None:
 				cur.execute('''
-				UPDATE member
-				SET last_msg = ?
-				WHERE user_id = ? AND server_id = ?
-				''', (time.time(), message.author.id, message.guild.id))
-			else:
-				cur.execute('''
-				INSERT INTO member(user_id, server_id, last_msg)
-				VALUES (?, ?, ?)
-				''', (message.author.id, message.guild.id, time.time()))
-			db.commit()
+				SELECT m.user_id
+				FROM member m
+				WHERE m.user_id = ? AND m.server_id = ?
+				''', (message.author.id, message.guild.id))
 
-			if message.guild != None and not message.author.guild_permissions.administrator:
-				roles = cur.execute('''
-				SELECT r.role_id
-				FROM role r
-				WHERE r.server_id = ? AND r.bot_permission = TRUE
-				''', (message.guild.id,)).fetchall()
-				if len(roles) > 0 and not any((role.id,) in roles for role in message.author.roles):
-					return
+				if cur.fetchall():
+					cur.execute('''
+					UPDATE member
+					SET last_msg = ?
+					WHERE user_id = ? AND server_id = ?
+					''', (time.time(), message.author.id, message.guild.id))
+				else:
+					cur.execute('''
+					INSERT INTO member(user_id, server_id, last_msg)
+					VALUES (?, ?, ?)
+					''', (message.author.id, message.guild.id, time.time()))
+				db.commit()
+
+				if message.guild != None and not message.author.guild_permissions.administrator:
+					roles = cur.execute('''
+					SELECT r.role_id
+					FROM role r
+					WHERE r.server_id = ? AND r.bot_permission = TRUE
+					''', (message.guild.id,)).fetchall()
+					if len(roles) > 0 and not any((role.id,) in roles for role in message.author.roles):
+						return
 
 			return_message = []
 
