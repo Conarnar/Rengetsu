@@ -9,7 +9,7 @@ async def command_settings(line, message, meta, reng):
 
 	db = reng.db()
 	cur = db.cursor()
-	db.execute('''
+	cur.execute('''
 	SELECT r.role_id
 	FROM role r
 	WHERE r.server_id = ? AND r.admin_permission = TRUE

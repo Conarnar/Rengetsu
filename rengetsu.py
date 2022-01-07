@@ -115,17 +115,17 @@ class Rengetsu:
 				WHERE r.server_id = ? AND r.add_on_inactive = TRUE AND r.role_id = rm.added_id
 				''', (server_id,)).fetchall()
 
-				for user_id in cur2:
+				for user_id, in cur2:
 					member = guild.get_member(user_id)
 					if member == None:
 						continue
 						
-					for role_id in to_add:
+					for role_id, in to_add:
 						role = guild.get_role(role_id)
 						if role != None and role not in member.roles:
 							await member.add_roles(role, reason='Inactive')
 
-					for role_id in to_rem:
+					for role_id, in to_rem:
 						role = guild.get_role(role_id)
 						if role != None and role in member.roles:
 							await member.remove_roles(role, reason='Inactive')
@@ -215,7 +215,7 @@ class Rengetsu:
 			WHERE c.server_id = ? AND c.msg_log = TRUE
 			''', (payload.guild_id,)).fetchall()
 			
-			if int(payload.channel_id) in msglog_channel_ids:
+			if (int(payload.channel_id),) in msglog_channel_ids:
 				return
 
 			msg = f"Message deleted from channel <#{payload.channel_id}>\n"
@@ -232,7 +232,7 @@ class Rengetsu:
 				msg += '\nMessage:'
 
 
-			for channel_id in msglog_channel_ids:
+			for channel_id, in msglog_channel_ids:
 				channel = self.client.get_channel(channel_id)
 				if channel != None:
 					await channel.send(msg)
@@ -286,7 +286,7 @@ class Rengetsu:
 			WHERE c.server_id = ? AND c.user_log = TRUE
 			''', (member.guild.id,))
 
-			for channel_id in cur:
+			for channel_id, in cur:
 				channel = member.guild.get_channel(channel_id)
 				if channel != None:
 					await channel.send(f'{member.mention} (Username: {member}) has joined the server.')
@@ -297,7 +297,7 @@ class Rengetsu:
 			WHERE r.server_id = ? AND r.add_on_join = TRUE
 			''', (member.guild.id,))
 
-			for role_id in cur:
+			for role_id, in cur:
 				role = member.guild.get_role(role_id)
 				if role != None:
 					await member.add_roles(role, reason='Added on join')
@@ -318,7 +318,7 @@ class Rengetsu:
 			WHERE c.server_id = ? AND c.user_log = TRUE
 			''', (member.guild.id,))
 
-			for channel_id in cur:
+			for channel_id, in cur:
 				channel = member.guild.get_channel(channel_id)
 				if channel != None:
 					await channel.send(f'{member.mention} (Username: {member}) has left the server.')
