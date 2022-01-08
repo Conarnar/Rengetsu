@@ -366,7 +366,6 @@ class Rengetsu:
 					INSERT INTO member(user_id, server_id, last_msg)
 					VALUES (?, ?, ?)
 					''', (message.author.id, message.guild.id, time.time()))
-				db.commit()
 
 				if message.guild != None and not message.author.guild_permissions.administrator:
 					roles = cur.execute('''
@@ -376,6 +375,7 @@ class Rengetsu:
 					''', (message.guild.id,)).fetchall()
 					if len(roles) > 0 and not any((role.id,) in roles for role in message.author.roles):
 						return
+			db.commit()
 
 			return_message = []
 
