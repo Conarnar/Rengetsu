@@ -75,7 +75,7 @@ class Rengetsu:
 			await asyncio.sleep(3600)
 			now = time.time()
 
-			rows = sum(([(member.id, guild.id, now) for member in guild.members] for guild in self.client.guilds), [])
+			rows = sum(([(member.id, guild.id, now) for member in guild.members if not member.bot] for guild in self.client.guilds), [])
 			db = self.db()
 			cur = db.cursor()
 			
@@ -99,7 +99,7 @@ class Rengetsu:
 				cur2 = db.execute('''
 				SELECT m.user_id
 				FROM member m
-				WHERE m.server_id = ? AND m.last_msg > ?
+				WHERE m.server_id = ? AND m.last_msg < ?
 				''', (server_id, now - (inactive_days * 24 * 60 * 60)))
 
 				cur3 = db.cursor() 
@@ -125,7 +125,7 @@ class Rengetsu:
 						if role != None and role not in member.roles:
 							await member.add_roles(role, reason='Inactive')
 
-					for role_id, in to_rem:
+					for role_id, in to_remove:
 						role = guild.get_role(role_id)
 						if role != None and role in member.roles:
 							await member.remove_roles(role, reason='Inactive')
