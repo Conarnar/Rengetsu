@@ -215,7 +215,7 @@ class Rengetsu:
 			WHERE c.server_id = ? AND c.msg_log = TRUE
 			''', (payload.guild_id,)).fetchall()
 			
-			if (int(payload.channel_id),) in msglog_channel_ids:
+			if (int(payload.channel_id),) in msglog_channel_ids or payload.cached_message.author.bot:
 				return
 
 			msg = f"Message deleted from channel <#{payload.channel_id}>\n"
