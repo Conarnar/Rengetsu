@@ -7,7 +7,7 @@ functions = {'sqrt': math.sqrt, 'sin': math.sin, 'cos': math.cos, 'tan': math.ta
 'sinh': math.sinh, 'cosh': math.cosh, 'tanh': math.tanh, 'arcsinh': math.asinh, 'arccosh': math.acosh, 'arctanh': math.atanh,
 'asin': math.asin, 'acos': math.acos, 'atan': math.atan, 'asinh': math.asinh, 'acosh': math.acosh, 'atanh': math.atanh,
 'ceil': math.ceil, 'floor': math.floor, 'trunc': math.trunc,
-'ln': math.log, 'abs': abs, 'rand': random.randrange}
+'ln': math.log, 'abs': abs, 'rand': random.randrange, "fact": math.factorial}
 
 mr_re = re.compile(r'(\d+)d(\d+)(?:d([lh])(\d*))?')
 var_re = re.compile(r'^[_a-zA-Z][_\w]*')
